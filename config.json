@@ -1,0 +1,20 @@
+{
+    "api_key": "YOUR_API_KEY_HERE",
+    "default_stock": "PETR3.SA",
+    "data_fetch_interval": "1d",
+    "chart_settings": {
+        "type": "line",
+        "colors": ["#1f77b4", "#ff7f0e"],
+        "show_legend": true
+    },
+    "sectors": [
+        "Finance",
+        "Technology",
+        "Consumer Goods",
+        "Energy",
+        "Utilities",
+        "Healthcare",
+        "Materials",
+        "Telecommunications"
+    ]
+}
