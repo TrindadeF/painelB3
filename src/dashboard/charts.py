@@ -175,67 +175,76 @@ def update_chart(stock, compared_stock=None):
     except Exception as e:
         print(f"Erro ao atualizar gráfico: {e}")
 
+import yfinance as yf
+import numpy as np
+
 def create_comparison_chart(selected_stocks, master=None):
     """
     Cria um gráfico comparativo entre as ações selecionadas
+    
+    Args:
+        selected_stocks: Lista de códigos de ações para comparar
+        master: Widget Tkinter onde o gráfico será exibido
+        
+    Returns:
+        FigureCanvasTkAgg: Canvas do matplotlib se master é fornecido
+        matplotlib figure: Figura do matplotlib caso contrário
     """
     if not selected_stocks:
         return None
         
     plt.figure(figsize=(10, 6))
     
-    end_date = int(datetime.now().timestamp())
-    start_date = int((datetime.now() - timedelta(days=365)).timestamp())
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=365)
     
-    # Armazenar dados normalizados para comparação
-    normalized_data = {}
-    
+    # Preparar códigos de ticker com .SA
+    tickers = []
     for stock in selected_stocks:
-        try:
-            # Adicionar sufixo .SA se não estiver presente
-            if not stock.endswith('.SA'):
-                stock_code = f"{stock}.SA"
-            else:
-                stock_code = stock
-                
-            # Buscar dados via investiny
-            stock_data_result = inv.get_historical_data(
-                symbol=stock_code,
-                country="brazil",
-                from_date=start_date,
-                to_date=end_date,
-                interval="1d"
-            )
+        if not stock.endswith('.SA'):
+            tickers.append(f"{stock}.SA")
+        else:
+            tickers.append(stock)
             
-            # Processar dados
-            if stock_data_result and 'quotes' in stock_data_result:
-                df = pd.DataFrame(stock_data_result['quotes'])
-                
-                # Converter timestamp para datetime
-                df['date'] = pd.to_datetime(df['date'], unit='s')
-                df.set_index('date', inplace=True)
-                
-                # Normalizar os dados para começar de 100
-                normalized_price = 100 * (df['close'] / df['close'].iloc[0])
-                normalized_data[stock] = normalized_price
-                
-                plt.plot(df.index, normalized_price, label=stock)
-                
-        except Exception as e:
-            print(f"Erro ao obter dados para {stock}: {e}")
-    
-    plt.title("Comparação de Desempenho (Base 100)")
-    plt.xlabel("Data")
-    plt.ylabel("Preço Normalizado")
-    plt.legend()
-    plt.grid(True)
-    
-    if master:
-        canvas = FigureCanvasTkAgg(plt.gcf(), master=master)
-        canvas.draw()
-        return canvas
-    else:
-        return plt.gcf()
+    # Baixar dados de todas as ações de uma vez
+    try:
+        data = yf.download(tickers, start=start_date, end=end_date, progress=False)
+        
+        if data.empty:
+            return None
+        
+        # Se há apenas uma ação, o formato é diferente
+        if isinstance(data.columns, pd.MultiIndex):
+            close_prices = data['Close']
+        else:
+            # Para uma única ação
+            close_prices = pd.DataFrame(data['Close'])
+            close_prices.columns = [tickers[0]]
+        
+        # Normalizar os dados
+        normalized_data = close_prices.copy()
+        
+        for ticker in normalized_data.columns:
+            # Normalizar para começar de 100
+            normalized_data[ticker] = 100 * normalized_data[ticker] / normalized_data[ticker].iloc[0]
+            plt.plot(normalized_data.index, normalized_data[ticker], label=ticker.replace('.SA', ''))
+            
+        plt.title("Comparação de Desempenho (Base 100)")
+        plt.xlabel("Data")
+        plt.ylabel("Preço Normalizado")
+        plt.legend()
+        plt.grid(True)
+        
+        if master:
+            canvas = FigureCanvasTkAgg(plt.gcf(), master=master)
+            canvas.draw()
+            return canvas
+        else:
+            return plt.gcf()
+            
+    except Exception as e:
+        print(f"Erro ao criar gráfico de comparação: {e}")
+        return None
 
 def create_return_comparison_chart(performance_df, selected_stocks, return_type='yearly'):
     """
@@ -250,7 +259,7 @@ def create_return_comparison_chart(performance_df, selected_stocks, return_type=
         return None
         
     # Filtrar dados para as ações selecionadas
-    filtered_data = performance_df[performance_df['code'].isin(selected_stocks)]
+    filtered_data = performance_df[performance_df['code'].isin([s.replace('.SA', '') for s in selected_stocks])]
     
     if filtered_data.empty:
         return None
@@ -267,7 +276,7 @@ def create_return_comparison_chart(performance_df, selected_stocks, return_type=
     for bar in bars:
         height = bar.get_height()
         plt.text(bar.get_x() + bar.get_width()/2., height,
-                 f'{height:.2f}%', ha='center', va='bottom')
+                f'{height:.2f}%', ha='center', va='bottom')
     
     plt.title(f'Comparação de Retorno {return_type.capitalize()}')
     plt.ylabel('Retorno (%)')

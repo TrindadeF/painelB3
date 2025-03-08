@@ -1,4 +1,4 @@
-import investiny as inv
+import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 import time
@@ -26,27 +26,28 @@ def get_market_sectors():
     return sector_dict
 
 def get_stock_performance(stock_code):
+    """
+    Calcula o desempenho de uma ação em diferentes períodos
+    
+    Args:
+        stock_code: Código da ação (com ou sem sufixo .SA)
+    """
+    # Adicionar .SA se necessário
     if not stock_code.endswith('.SA'):
         stock_code = f"{stock_code}.SA"
         
     # Definir datas
-    end_date = int(datetime.now().timestamp())
-    start_date = int((datetime.now() - timedelta(days=365)).timestamp())
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=365)
     
     try:
         # Adicionar um pequeno delay para evitar bloqueios
         time.sleep(1 + random.random())
         
-        # Obter dados históricos
-        stock_data = inv.get_historical_data(
-            symbol=stock_code,
-            country="brazil",
-            from_date=start_date,
-            to_date=end_date,
-            interval="1d"
-        )
+        # Obter dados históricos usando yfinance
+        df = yf.download(stock_code, start=start_date, end=end_date, progress=False)
         
-        if not stock_data or 'quotes' not in stock_data:
+        if df.empty:
             return {
                 'year': 0,
                 'last_12_months': 0,
@@ -54,19 +55,14 @@ def get_stock_performance(stock_code):
                 'week': 0,
                 'day': 0
             }
-            
-        # Converter para DataFrame
-        df = pd.DataFrame(stock_data['quotes'])
-        df['date'] = pd.to_datetime(df['date'], unit='s')
-        df.set_index('date', inplace=True)
         
         # Calcular desempenho
         performance = {
-            'year': ((df['close'].iloc[-1] / df['close'].iloc[0]) - 1) if len(df) > 252 else 0,
-            'last_12_months': ((df['close'].iloc[-1] / df['close'].iloc[0]) - 1) if len(df) > 252 else 0,
-            'month': ((df['close'].iloc[-1] / df['close'].iloc[-22]) - 1) if len(df) > 22 else 0,
-            'week': ((df['close'].iloc[-1] / df['close'].iloc[-6]) - 1) if len(df) > 6 else 0,
-            'day': (df['close'].pct_change().iloc[-1]) if len(df) > 1 else 0,
+            'year': ((df['Close'].iloc[-1] / df['Close'].iloc[0]) - 1) if len(df) > 252 else 0,
+            'last_12_months': ((df['Close'].iloc[-1] / df['Close'].iloc[0]) - 1) if len(df) > 252 else 0,
+            'month': ((df['Close'].iloc[-1] / df['Close'].iloc[-22]) - 1) if len(df) > 22 else 0,
+            'week': ((df['Close'].iloc[-1] / df['Close'].iloc[-6]) - 1) if len(df) > 6 else 0,
+            'day': (df['Close'].pct_change().iloc[-1]) if len(df) > 1 else 0,
         }
         return performance
     except Exception as e:
@@ -90,48 +86,34 @@ def compare_stock_performance(stock_code1, stock_code2):
         stock_code2 = f"{stock_code2}.SA"
     
     # Definir datas
-    end_date = int(datetime.now().timestamp())
-    start_date = int((datetime.now() - timedelta(days=365)).timestamp())
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=365)
     
     try:
-        # Obter dados para primeira ação
-        time.sleep(1 + random.random())  # Delay para evitar bloqueios
-        stock_data1 = inv.get_historical_data(
-            symbol=stock_code1,
-            country="brazil",
-            from_date=start_date,
-            to_date=end_date,
-            interval="1d"
+        # Obter dados para ambas as ações usando yfinance
+        data = yf.download(
+            [stock_code1, stock_code2], 
+            start=start_date, 
+            end=end_date, 
+            progress=False
         )
         
-        # Obter dados para segunda ação
-        time.sleep(1 + random.random())
-        stock_data2 = inv.get_historical_data(
-            symbol=stock_code2,
-            country="brazil",
-            from_date=start_date,
-            to_date=end_date,
-            interval="1d"
-        )
-        
-        # Verificar se os dados foram obtidos corretamente
-        if not stock_data1 or not stock_data2 or 'quotes' not in stock_data1 or 'quotes' not in stock_data2:
+        if data.empty:
             return pd.DataFrame()
-            
-        # Processar dados
-        df1 = pd.DataFrame(stock_data1['quotes'])
-        df1['date'] = pd.to_datetime(df1['date'], unit='s')
-        df1.set_index('date', inplace=True)
         
-        df2 = pd.DataFrame(stock_data2['quotes'])
-        df2['date'] = pd.to_datetime(df2['date'], unit='s')
-        df2.set_index('date', inplace=True)
-        
-        # Criar DataFrame de comparação
-        comparison_data = pd.DataFrame({
-            stock_code1.replace('.SA', ''): df1['close'],
-            stock_code2.replace('.SA', ''): df2['close']
-        }, index=df1.index)
+        # Se há apenas uma ação, o formato é diferente
+        if isinstance(data.columns, pd.MultiIndex):
+            # Organizar dados em formato de comparação
+            close_prices = data['Close']
+            comparison_data = pd.DataFrame({
+                stock_code1.replace('.SA', ''): close_prices[stock_code1],
+                stock_code2.replace('.SA', ''): close_prices[stock_code2]
+            })
+        else:
+            # Se tivermos apenas uma ação válida
+            comparison_data = pd.DataFrame({
+                stock_code1.replace('.SA', ''): data['Close']
+            })
         
         return comparison_data
     except Exception as e:
