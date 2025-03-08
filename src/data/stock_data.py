@@ -74,59 +74,189 @@ def get_all_brazil_stocks():
         return pd.DataFrame({'symbol': list(get_stock_sectors().keys())})
 
 def get_stock_sectors():
-    """Retorna um dicionário que mapeia ações aos seus respectivos setores"""
+    """Retorna um dicionário completo que mapeia ações aos seus respectivos setores da B3"""
     try:
         sector_mapping = {
-            # Financeiro
-            'ITUB4.SA': 'Financeiro', 'BBDC4.SA': 'Financeiro', 'B3SA3.SA': 'Financeiro',
-            'BBAS3.SA': 'Financeiro', 'SANB11.SA': 'Financeiro', 'BBSE3.SA': 'Financeiro',
-            'IRBR3.SA': 'Financeiro', 'WEGE3.SA': 'Financeiro',
+            # Setor Financeiro
+            'ITUB4.SA': 'Financeiro',
+            'BBDC4.SA': 'Financeiro',
+            'BBAS3.SA': 'Financeiro',
+            'SANB11.SA': 'Financeiro',
+            'B3SA3.SA': 'Financeiro',
+            'BPAC11.SA': 'Financeiro',
+            'BBSE3.SA': 'Financeiro',
+            'CIEL3.SA': 'Financeiro',
+            'IRBR3.SA': 'Financeiro',
+            'SULA11.SA': 'Financeiro',
+            'PSSA3.SA': 'Financeiro',
+            'BPAN4.SA': 'Financeiro',
+            'ABCB4.SA': 'Financeiro',
+            'BRSR6.SA': 'Financeiro',
             
-            # Energia/Petróleo
-            'PETR3.SA': 'Energia', 'PETR4.SA': 'Energia', 'CSAN3.SA': 'Energia',
-            'UGPA3.SA': 'Energia', 'PRIO3.SA': 'Energia', 'RAPT4.SA': 'Energia',
-            'VBBR3.SA': 'Energia', 'ENAT3.SA': 'Energia',
+            # Materiais Básicos
+            'VALE3.SA': 'Materiais Básicos',
+            'SUZB3.SA': 'Materiais Básicos',
+            'KLBN11.SA': 'Materiais Básicos',
+            'CSNA3.SA': 'Materiais Básicos',
+            'GGBR4.SA': 'Materiais Básicos',
+            'GOAU4.SA': 'Materiais Básicos',
+            'BRAP4.SA': 'Materiais Básicos',
+            'USIM5.SA': 'Materiais Básicos',
+            'DXCO3.SA': 'Materiais Básicos',
+            'BRKM5.SA': 'Materiais Básicos',
+            'UNIP6.SA': 'Materiais Básicos',
             
-            # Mineração
-            'VALE3.SA': 'Mineração', 'CSNA3.SA': 'Mineração', 'GGBR4.SA': 'Mineração',
-            'USIM5.SA': 'Mineração', 'GOAU4.SA': 'Mineração', 'BRAP4.SA': 'Mineração',
+            # Petróleo, Gás e Biocombustíveis
+            'PETR3.SA': 'Petróleo e Gás',
+            'PETR4.SA': 'Petróleo e Gás',
+            'PRIO3.SA': 'Petróleo e Gás',
+            'CSAN3.SA': 'Petróleo e Gás',
+            'VBBR3.SA': 'Petróleo e Gás',
+            'RAPT4.SA': 'Petróleo e Gás',
+            'RRRP3.SA': 'Petróleo e Gás',
+            'UGPA3.SA': 'Petróleo e Gás',
             
-            # Consumo
-            'ABEV3.SA': 'Consumo', 'LREN3.SA': 'Consumo', 'MGLU3.SA': 'Consumo',
-            'NTCO3.SA': 'Consumo', 'AMER3.SA': 'Consumo', 'LWSA3.SA': 'Consumo', 
-            'CRFB3.SA': 'Consumo', 'PCAR3.SA': 'Consumo', 'ASAI3.SA': 'Consumo',
+            # Utilities (Utilidade Pública)
+            'SBSP3.SA': 'Utilidade Pública',
+            'ELET3.SA': 'Utilidade Pública',
+            'ELET6.SA': 'Utilidade Pública',
+            'CMIG4.SA': 'Utilidade Pública',
+            'CPFE3.SA': 'Utilidade Pública',
+            'ENGI11.SA': 'Utilidade Pública',
+            'ENEV3.SA': 'Utilidade Pública',
+            'EGIE3.SA': 'Utilidade Pública',
+            'EQTL3.SA': 'Utilidade Pública',
+            'TAEE11.SA': 'Utilidade Pública',
+            'TIET11.SA': 'Utilidade Pública',
+            'NEOE3.SA': 'Utilidade Pública',
+            'ALUP11.SA': 'Utilidade Pública',
+            'CSMG3.SA': 'Utilidade Pública',
+            'SAPR11.SA': 'Utilidade Pública',
+            'GEPA4.SA': 'Utilidade Pública',
             
-            # Utilities
-            'SBSP3.SA': 'Utilities', 'CMIG4.SA': 'Utilities', 'ELET3.SA': 'Utilities',
-            'ELET6.SA': 'Utilities', 'CPFE3.SA': 'Utilities', 'ENGI11.SA': 'Utilities',
-            'TAEE11.SA': 'Utilities', 'EQTL3.SA': 'Utilities',
+            # Consumo não Cíclico
+            'ABEV3.SA': 'Consumo não Cíclico',
+            'NTCO3.SA': 'Consumo não Cíclico',
+            'JBSS3.SA': 'Consumo não Cíclico',
+            'MRFG3.SA': 'Consumo não Cíclico',
+            'BRFS3.SA': 'Consumo não Cíclico',
+            'SMTO3.SA': 'Consumo não Cíclico',
+            'BEEF3.SA': 'Consumo não Cíclico',
+            'CAML3.SA': 'Consumo não Cíclico',
+            'MDIA3.SA': 'Consumo não Cíclico',
+            'CRFB3.SA': 'Consumo não Cíclico',
+            'PCAR3.SA': 'Consumo não Cíclico',
+            'ASAI3.SA': 'Consumo não Cíclico',
+            'SLCE3.SA': 'Consumo não Cíclico',
             
-            # Imobiliário
-            'BRCR11.SA': 'Imobiliário', 'KNRI11.SA': 'Imobiliário', 'HGLG11.SA': 'Imobiliário',
-            'VISC11.SA': 'Imobiliário', 'HGBS11.SA': 'Imobiliário', 'XPLG11.SA': 'Imobiliário',
-            
-            # Telecomunicações
-            'VIVT3.SA': 'Telecomunicações', 'TIMS3.SA': 'Telecomunicações', 'OIBR3.SA': 'Telecomunicações',
-            'TELB4.SA': 'Telecomunicações',
+            # Consumo Cíclico
+            'LREN3.SA': 'Consumo Cíclico',
+            'MGLU3.SA': 'Consumo Cíclico',
+            'AMER3.SA': 'Consumo Cíclico',
+            'VVAR3.SA': 'Consumo Cíclico',
+            'LWSA3.SA': 'Consumo Cíclico',
+            'HGTX3.SA': 'Consumo Cíclico',
+            'SOMA3.SA': 'Consumo Cíclico',
+            'CEAB3.SA': 'Consumo Cíclico',
+            'AMAR3.SA': 'Consumo Cíclico',
+            'CVCB3.SA': 'Consumo Cíclico',
+            'MOVI3.SA': 'Consumo Cíclico',
+            'VAMO3.SA': 'Consumo Cíclico',
+            'RENT3.SA': 'Consumo Cíclico',
+            'LCAM3.SA': 'Consumo Cíclico',
+            'PETZ3.SA': 'Consumo Cíclico',
+            'ARML3.SA': 'Consumo Cíclico',
+            'SBFG3.SA': 'Consumo Cíclico',
+            'ALPA4.SA': 'Consumo Cíclico',
+            'GRND3.SA': 'Consumo Cíclico',
+            'GUAR3.SA': 'Consumo Cíclico',
+            'VULC3.SA': 'Consumo Cíclico',
             
             # Saúde
-            'HAPV3.SA': 'Saúde', 'FLRY3.SA': 'Saúde', 'RDOR3.SA': 'Saúde', 
-            'GNDI3.SA': 'Saúde', 'AALR3.SA': 'Saúde',
+            'RDOR3.SA': 'Saúde',
+            'HAPV3.SA': 'Saúde',
+            'FLRY3.SA': 'Saúde',
+            'QUAL3.SA': 'Saúde',
+            'PNVL3.SA': 'Saúde',
+            'HYPE3.SA': 'Saúde',
+            'DASA3.SA': 'Saúde',
+            'AALR3.SA': 'Saúde',
+            'MATD3.SA': 'Saúde',
+            'ODPV3.SA': 'Saúde',
             
-            # Transporte
-            'CCRO3.SA': 'Transporte', 'RAIL3.SA': 'Transporte', 'ECOR3.SA': 'Transporte',
-            'AZUL4.SA': 'Transporte', 'GOLL4.SA': 'Transporte', 'STBP3.SA': 'Transporte',
+            # Tecnologia da Informação
+            'TOTS3.SA': 'Tecnologia',
+            'CASH3.SA': 'Tecnologia',
+            'LVTC3.SA': 'Tecnologia',
+            'NINJ3.SA': 'Tecnologia',
+            'IFCM3.SA': 'Tecnologia',
+            'SQIA3.SA': 'Tecnologia',
+            'POSI3.SA': 'Tecnologia',
+            'LINX3.SA': 'Tecnologia',
             
-            # Construção
-            'CYRE3.SA': 'Construção', 'EZTC3.SA': 'Construção', 'MRVE3.SA': 'Construção',
-            'DIRR3.SA': 'Construção', 'TEND3.SA': 'Construção', 'EVEN3.SA': 'Construção',
+            # Bens Industriais
+            'WEGE3.SA': 'Bens Industriais',
+            'EMBR3.SA': 'Bens Industriais',
+            'RAIL3.SA': 'Bens Industriais',
+            'TGMA3.SA': 'Bens Industriais',
+            'INTB3.SA': 'Bens Industriais',
+            'MYPK3.SA': 'Bens Industriais',
+            'FRAS3.SA': 'Bens Industriais',
+            'TUPY3.SA': 'Bens Industriais',
+            'KEPL3.SA': 'Bens Industriais',
+            'LEVE3.SA': 'Bens Industriais',
+            'METAL3.SA': 'Bens Industriais',
+            'ROMI3.SA': 'Bens Industriais',
+            'EALT4.SA': 'Bens Industriais',
+            
+            # Comunicações
+            'VIVT3.SA': 'Comunicações',
+            'TIMS3.SA': 'Comunicações',
+            'TELB4.SA': 'Comunicações',
+            'OIBR3.SA': 'Comunicações',
+            'OIBR4.SA': 'Comunicações',
+            
+            # Transporte e Logística
+            'CCRO3.SA': 'Transporte',
+            'ECOR3.SA': 'Transporte',
+            'AZUL4.SA': 'Transporte',
+            'GOLL4.SA': 'Transporte',
+            'STBP3.SA': 'Transporte',
+            'HBSA3.SA': 'Transporte',
+            'PSSA3.SA': 'Transporte',
+            'WEST3.SA': 'Transporte',
+            'TPIS3.SA': 'Transporte',
+            
+            # Imobiliário / Construção Civil
+            'CYRE3.SA': 'Imobiliário',
+            'EZTC3.SA': 'Imobiliário',
+            'MRVE3.SA': 'Imobiliário',
+            'DIRR3.SA': 'Imobiliário',
+            'TEND3.SA': 'Imobiliário',
+            'EVEN3.SA': 'Imobiliário',
+            'JHSF3.SA': 'Imobiliário',
+            'GFSA3.SA': 'Imobiliário',
+            'HBOR3.SA': 'Imobiliário',
+            
+            # Fundos Imobiliários (mesmo não sendo ações, são populares)
+            'BRCR11.SA': 'Fundos Imobiliários',
+            'KNRI11.SA': 'Fundos Imobiliários',
+            'HGLG11.SA': 'Fundos Imobiliários',
+            'VISC11.SA': 'Fundos Imobiliários',
+            'HGBS11.SA': 'Fundos Imobiliários',
+            'XPLG11.SA': 'Fundos Imobiliários',
+            'XPML11.SA': 'Fundos Imobiliários',
+            'MXRF11.SA': 'Fundos Imobiliários',
+            'BCFF11.SA': 'Fundos Imobiliários',
+            'BBPO11.SA': 'Fundos Imobiliários',
+            'HFOF11.SA': 'Fundos Imobiliários',
             
             # Educação
-            'YDUQ3.SA': 'Educação', 'COGN3.SA': 'Educação', 'SEER3.SA': 'Educação',
-            
-            # Tecnologia
-            'TOTS3.SA': 'Tecnologia', 'CASH3.SA': 'Tecnologia', 'LVTC3.SA': 'Tecnologia',
-            'NINJ3.SA': 'Tecnologia', 'IFCM3.SA': 'Tecnologia'
+            'YDUQ3.SA': 'Educação',
+            'COGN3.SA': 'Educação',
+            'SEER3.SA': 'Educação',
+            'AESB3.SA': 'Educação',
+            'BAHI3.SA': 'Educação',
         }
         return sector_mapping
     except Exception as e:

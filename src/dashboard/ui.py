@@ -284,29 +284,60 @@ class BrazilStocksDashboard:
         if price_chart:
             price_chart.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Tab para retorno anual
-        annual_tab = ttk.Frame(notebook)
-        notebook.add(annual_tab, text="Retorno Anual")
+        # Verificar quais colunas de retorno estão disponíveis
+        columns = self.performance_data.columns.tolist()
         
-        annual_fig = create_return_comparison_chart(self.performance_data, 
-                                                   self.comparison_stocks, 
-                                                   'yearly')
-        if annual_fig:
-            annual_canvas = FigureCanvasTkAgg(annual_fig, annual_tab)
-            annual_canvas.draw()
-            annual_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Tab para retorno anual - usando o nome correto da coluna
+        if 'yearly_return' in columns:
+            annual_tab = ttk.Frame(notebook)
+            notebook.add(annual_tab, text="Retorno Anual")
             
-        # Tab para retorno mensal
-        monthly_tab = ttk.Frame(notebook)
-        notebook.add(monthly_tab, text="Retorno Mensal")
+            annual_fig = create_return_comparison_chart(self.performance_data, 
+                                                     self.comparison_stocks, 
+                                                     'yearly_return')
+            if annual_fig:
+                annual_canvas = FigureCanvasTkAgg(annual_fig, annual_tab)
+                annual_canvas.draw()
+                annual_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+            
+        # Tab para retorno mensal - usando o nome correto da coluna
+        if 'monthly_return' in columns:
+            monthly_tab = ttk.Frame(notebook)
+            notebook.add(monthly_tab, text="Retorno Mensal")
+            
+            monthly_fig = create_return_comparison_chart(self.performance_data, 
+                                                      self.comparison_stocks, 
+                                                      'monthly_return')
+            if monthly_fig:
+                monthly_canvas = FigureCanvasTkAgg(monthly_fig, monthly_tab)
+                monthly_canvas.draw()
+                monthly_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        monthly_fig = create_return_comparison_chart(self.performance_data, 
-                                                    self.comparison_stocks, 
-                                                    'monthly')
-        if monthly_fig:
-            monthly_canvas = FigureCanvasTkAgg(monthly_fig, monthly_tab)
-            monthly_canvas.draw()
-            monthly_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Tab para retorno semanal
+        if 'weekly_return' in columns:
+            weekly_tab = ttk.Frame(notebook)
+            notebook.add(weekly_tab, text="Retorno Semanal")
+            
+            weekly_fig = create_return_comparison_chart(self.performance_data, 
+                                                     self.comparison_stocks, 
+                                                     'weekly_return')
+            if weekly_fig:
+                weekly_canvas = FigureCanvasTkAgg(weekly_fig, weekly_tab)
+                weekly_canvas.draw()
+                weekly_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Tab para retorno diário
+        if 'daily_return' in columns:
+            daily_tab = ttk.Frame(notebook)
+            notebook.add(daily_tab, text="Retorno Diário")
+            
+            daily_fig = create_return_comparison_chart(self.performance_data, 
+                                                   self.comparison_stocks, 
+                                                   'daily_return')
+            if daily_fig:
+                daily_canvas = FigureCanvasTkAgg(daily_fig, daily_tab)
+                daily_canvas.draw()
+                daily_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
     
     def load_stock_data(self):
         """Carrega os dados filtrados na tabela"""
@@ -335,33 +366,50 @@ class BrazilStocksDashboard:
             self.page_label.config(text=f"Página {self.current_page + 1} de {total_pages}")
         
         # Preencher tabela
-        for i, (_, row) in enumerate(page_data.iterrows()):
-            item_id = self.stocks_table.insert(
-                "", 
-                "end", 
-                values=(
-                    row['code'],
-                    row['sector'],
-                    f"R$ {row['current_price']:.2f}",
-                    f"{row['daily_return']:.2f}%",
-                    f"{row['weekly_return']:.2f}%",
-                    f"{row['monthly_return']:.2f}%",
-                    f"{row['yearly_return']:.2f}%"
-                )
-            )
-            
-            # Definir tags para colorização
-            tags = []
-            if row['code'] in self.comparison_stocks:
-                tags.append('selected')
-            
-            if row['daily_return'] > 0:
-                tags.append('positive')
-            elif row['daily_return'] < 0:
-                tags.append('negative')
+        for _, row in page_data.iterrows():
+            try:
+                # Extrair valores individuais corretamente:
+                code = str(row['code']) if isinstance(row['code'], pd.Series) else str(row['code'])
+                sector = str(row['sector']) if isinstance(row['sector'], pd.Series) else str(row['sector'])
                 
-            if tags:
-                self.stocks_table.item(item_id, tags=tuple(tags))
+                # Usar .iloc[0] para Series ou o valor direto para escalares
+                price = float(row['current_price'].iloc[0]) if isinstance(row['current_price'], pd.Series) else float(row['current_price'])
+                daily = float(row['daily_return'].iloc[0]) if isinstance(row['daily_return'], pd.Series) else float(row['daily_return'])
+                weekly = float(row['weekly_return'].iloc[0]) if isinstance(row['weekly_return'], pd.Series) else float(row['weekly_return'])
+                monthly = float(row['monthly_return'].iloc[0]) if isinstance(row['monthly_return'], pd.Series) else float(row['monthly_return'])
+                yearly = float(row['yearly_return'].iloc[0]) if isinstance(row['yearly_return'], pd.Series) else float(row['yearly_return'])
+                
+                # Inserir na tabela com formatação apropriada
+                item_id = self.stocks_table.insert(
+                    "", 
+                    "end", 
+                    values=(
+                        code,
+                        sector,
+                        f"R$ {price:.2f}",
+                        f"{daily:.2f}%",
+                        f"{weekly:.2f}%",
+                        f"{monthly:.2f}%",
+                        f"{yearly:.2f}%"
+                    )
+                )
+                
+                # Definir tags para colorização
+                tags = []
+                if code in self.comparison_stocks:
+                    tags.append('selected')
+                
+                if daily > 0:
+                    tags.append('positive')
+                elif daily < 0:
+                    tags.append('negative')
+                    
+                if tags:
+                    self.stocks_table.item(item_id, tags=tuple(tags))
+            except Exception as e:
+                print(f"Erro ao processar linha: {e}")
+                # Continuar para a próxima linha em caso de erro
+                continue
     
     def get_filtered_data(self):
         """Retorna os dados filtrados com base nos critérios atuais"""

@@ -1,10 +1,13 @@
 # Substituir import de investpy por investiny
 import investiny as inv
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import pandas as pd
 from datetime import datetime, timedelta
-
+import yfinance as yf
+import numpy as np
+import matplotlib.dates as mdates
+import tkinter as tk
 from tkinter import Canvas, Frame, StringVar, OptionMenu
 
 class StockChart:
@@ -175,112 +178,175 @@ def update_chart(stock, compared_stock=None):
     except Exception as e:
         print(f"Erro ao atualizar gráfico: {e}")
 
-import yfinance as yf
-import numpy as np
-
-def create_comparison_chart(selected_stocks, master=None):
+def create_comparison_chart(stock_codes, parent_frame):
     """
-    Cria um gráfico comparativo entre as ações selecionadas
+    Cria um gráfico comparativo de evolução de preços normalizado (base 100)
+    """
+    try:
+        # Converter códigos para o formato do Yahoo Finance
+        yahoo_codes = [code if code.endswith('.SA') else f"{code}.SA" for code in stock_codes]
+        
+        # Definir período
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=365)
+        
+        # Buscar dados históricos
+        historical_data = yf.download(
+            yahoo_codes, 
+            start=start_date,
+            end=end_date,
+            progress=False
+        )
+        
+        if historical_data.empty:
+            print("Nenhum dado histórico disponível para as ações selecionadas")
+            return None
+            
+        # Extrair preços de fechamento
+        close_prices = historical_data['Close']
+        
+        # Normalizar preços (base 100)
+        normalized_prices = pd.DataFrame()
+        
+        for stock in close_prices.columns:
+            # Verificar se temos dados suficientes
+            if len(close_prices[stock].dropna()) > 0:
+                first_valid_price = close_prices[stock].dropna().iloc[0]
+                if first_valid_price > 0:  # Evitar divisão por zero
+                    normalized_prices[stock] = (close_prices[stock] / first_valid_price) * 100
+        
+        if normalized_prices.empty:
+            print("Nenhum dado normalizado disponível")
+            return None
+            
+        # Criar figura
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Plotar dados normalizados
+        for stock in normalized_prices.columns:
+            # Extrair código sem .SA para legenda
+            display_name = stock.replace('.SA', '')
+            ax.plot(normalized_prices.index, normalized_prices[stock], label=display_name)
+        
+        # Personalizar gráfico
+        ax.set_title('Evolução de Preço Normalizado (Base 100)')
+        ax.set_ylabel('Preço Normalizado')
+        ax.legend()
+        ax.grid(True, linestyle='--', alpha=0.7)
+        
+        # Configurar formatação de data no eixo x
+        date_format = mdates.DateFormatter('%b-%y')
+        ax.xaxis.set_major_formatter(date_format)
+        fig.autofmt_xdate()  # Rotacionar datas
+        
+        # Criar canvas para o Tkinter
+        canvas = FigureCanvasTkAgg(fig, parent_frame)
+        canvas.draw()
+        
+        # Adicionar barra de ferramentas
+        toolbar = NavigationToolbar2Tk(canvas, parent_frame, pack_toolbar=False)
+        toolbar.update()
+        toolbar.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        return canvas
+        
+    except Exception as e:
+        print(f"Erro ao criar gráfico comparativo: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def create_return_comparison_chart(data, stock_codes, return_column):
+    """
+    Cria um gráfico de barras comparando os retornos das ações selecionadas
     
     Args:
-        selected_stocks: Lista de códigos de ações para comparar
-        master: Widget Tkinter onde o gráfico será exibido
-        
-    Returns:
-        FigureCanvasTkAgg: Canvas do matplotlib se master é fornecido
-        matplotlib figure: Figura do matplotlib caso contrário
+        data: DataFrame com dados de desempenho
+        stock_codes: Lista de códigos de ações para comparar
+        return_column: Coluna de retorno para comparar ('daily_return', 'weekly_return', etc)
     """
-    if not selected_stocks:
-        return None
-        
-    plt.figure(figsize=(10, 6))
-    
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=365)
-    
-    # Preparar códigos de ticker com .SA
-    tickers = []
-    for stock in selected_stocks:
-        if not stock.endswith('.SA'):
-            tickers.append(f"{stock}.SA")
-        else:
-            tickers.append(stock)
-            
-    # Baixar dados de todas as ações de uma vez
     try:
-        data = yf.download(tickers, start=start_date, end=end_date, progress=False)
+        # Verificar se o nome da coluna está correto
+        if return_column not in data.columns:
+            # Tentar adicionar o sufixo _return se necessário
+            if not return_column.endswith('_return'):
+                adjusted_column = f"{return_column}_return"
+                if adjusted_column in data.columns:
+                    return_column = adjusted_column
+                else:
+                    print(f"Erro: Coluna de retorno '{return_column}' não encontrada.")
+                    print(f"Colunas disponíveis: {data.columns.tolist()}")
+                    return None
         
-        if data.empty:
+        # Filtrar apenas as ações selecionadas
+        filtered_data = data[data['code'].isin(stock_codes)].copy()
+        
+        if filtered_data.empty:
+            print("Nenhum dado encontrado para as ações selecionadas")
             return None
         
-        # Se há apenas uma ação, o formato é diferente
-        if isinstance(data.columns, pd.MultiIndex):
-            close_prices = data['Close']
-        else:
-            # Para uma única ação
-            close_prices = pd.DataFrame(data['Close'])
-            close_prices.columns = [tickers[0]]
+        # Configurar figura
+        plt.figure(figsize=(10, 6))
         
-        # Normalizar os dados
-        normalized_data = close_prices.copy()
+        # Extrair dados para cada código de ação
+        codes = []
+        returns = []
         
-        for ticker in normalized_data.columns:
-            # Normalizar para começar de 100
-            normalized_data[ticker] = 100 * normalized_data[ticker] / normalized_data[ticker].iloc[0]
-            plt.plot(normalized_data.index, normalized_data[ticker], label=ticker.replace('.SA', ''))
+        # Debug: mostrar colunas disponíveis
+        print(f"Colunas disponíveis no DataFrame: {filtered_data.columns.tolist()}")
+        
+        # Extrair dados para cada código de ação
+        for code in stock_codes:
+            if code in filtered_data['code'].values:
+                try:
+                    # Obter a linha específica para o código
+                    stock_data = filtered_data[filtered_data['code'] == code]
+                    
+                    # Verificar se a coluna existe
+                    if return_column in stock_data.columns:
+                        # Extrair o valor escalar do DataFrame
+                        return_value = float(stock_data[return_column].iloc[0])
+                        
+                        codes.append(code)
+                        returns.append(return_value)
+                    else:
+                        print(f"Aviso: Coluna '{return_column}' não encontrada para o código '{code}'")
+                        
+                except Exception as e:
+                    print(f"Erro ao processar código {code}: {e}")
+        
+        if not codes:
+            print("Nenhum dado válido disponível para os códigos selecionados")
+            return None
             
-        plt.title("Comparação de Desempenho (Base 100)")
-        plt.xlabel("Data")
-        plt.ylabel("Preço Normalizado")
-        plt.legend()
-        plt.grid(True)
+        # Definir cores com base no retorno
+        colors = ['#4CAF50' if r > 0 else '#F44336' for r in returns]
         
-        if master:
-            canvas = FigureCanvasTkAgg(plt.gcf(), master=master)
-            canvas.draw()
-            return canvas
-        else:
-            return plt.gcf()
-            
+        # Criar gráfico de barras
+        plt.bar(codes, returns, color=colors)
+        
+        # Adicionar valores nas barras
+        for i, v in enumerate(returns):
+            plt.text(i, v + (0.5 if v > 0 else -1.5), f'{v:.2f}%', 
+                     ha='center', fontweight='bold')
+        
+        # Personalizar gráfico
+        title_map = {
+            'daily_return': 'Retorno Diário (%)',
+            'weekly_return': 'Retorno Semanal (%)',
+            'monthly_return': 'Retorno Mensal (%)',
+            'yearly_return': 'Retorno Anual (%)',
+        }
+        
+        plt.title(title_map.get(return_column, f'Comparação de {return_column}'))
+        plt.ylabel('Retorno (%)')
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        
+        return plt.gcf()  # Retorna a figura atual
+        
     except Exception as e:
         print(f"Erro ao criar gráfico de comparação: {e}")
+        import traceback
+        traceback.print_exc()
         return None
-
-def create_return_comparison_chart(performance_df, selected_stocks, return_type='yearly'):
-    """
-    Cria um gráfico de barras para comparar retornos específicos entre ações
-    
-    Args:
-        performance_df: DataFrame com dados de desempenho
-        selected_stocks: Lista de ações para comparar
-        return_type: Tipo de retorno ('daily', 'weekly', 'monthly', 'yearly')
-    """
-    if len(selected_stocks) == 0:
-        return None
-        
-    # Filtrar dados para as ações selecionadas
-    filtered_data = performance_df[performance_df['code'].isin([s.replace('.SA', '') for s in selected_stocks])]
-    
-    if filtered_data.empty:
-        return None
-        
-    # Criar gráfico de barras
-    plt.figure(figsize=(10, 6))
-    
-    return_column = f"{return_type}_return"
-    
-    # Plotar gráfico de barras
-    bars = plt.bar(filtered_data['code'], filtered_data[return_column], color='skyblue')
-    
-    # Adicionar valor em cada barra
-    for bar in bars:
-        height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2., height,
-                f'{height:.2f}%', ha='center', va='bottom')
-    
-    plt.title(f'Comparação de Retorno {return_type.capitalize()}')
-    plt.ylabel('Retorno (%)')
-    plt.xlabel('Ação')
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    
-    return plt.gcf()
