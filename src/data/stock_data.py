@@ -14,6 +14,9 @@ from .stock_cache import StockDataCache
 # Configurar logging
 logging.getLogger('yfinance').setLevel(logging.ERROR)
 
+# Lista de ações ignoradas (deslistadas ou com problemas)
+IGNORED_STOCKS = ['LCAM3.SA', 'HAPV3.SA', 'VULC3.SA', 'GUAR3.SA']
+
 def get_all_brazil_stocks():
     """
     Obtém lista completa de ações da B3
@@ -270,6 +273,13 @@ def get_stock_sectors():
 # Modificar a função fetch_stock_data para buscar apenas dados necessários
 def fetch_stock_data(stock_code, max_retries=3, loading_screen=None):
     """Obtém dados históricos de uma ação específica com mecanismo de retry"""
+    
+    # Verificar se a ação está na lista de ignoradas
+    if stock_code in IGNORED_STOCKS:
+        if loading_screen:
+            loading_screen.log(f"Ignorando {stock_code} (ação deslistada ou com problemas conhecidos)")
+        return None
+    
     retries = 0
     
     # Adicionar sufixo .SA se não estiver presente
@@ -323,52 +333,49 @@ def fetch_stock_data(stock_code, max_retries=3, loading_screen=None):
     return None
 
 def calculate_returns(stock_data):
-    """Calcula retornos diários, semanais, mensais e anuais para uma ação"""
-    # Código existente mantido sem alterações
-    if stock_data is None or len(stock_data) < 20:  # Pelo menos 20 dias de dados
-        return {
-            'daily': 0,
-            'weekly': 0,
-            'monthly': 0,
-            'yearly': 0
-        }
-    
+    """Calcula os retornos de uma ação para diferentes períodos"""
     try:
-        # Calcular retornos
-        stock_data['daily_return'] = stock_data['Close'].pct_change()
+        # Garantir que estamos trabalhando com uma única coluna 'Close'
+        if isinstance(stock_data['Close'], pd.DataFrame):
+            close_values = stock_data['Close'].iloc[:, 0]  # Pegar apenas a primeira coluna
+        else:
+            close_values = stock_data['Close']
+            
+        # Calcular retornos com fill_method=None para evitar o aviso de depreciação
+        daily_return = close_values.pct_change(periods=1, fill_method=None).iloc[-1]
+        weekly_return = close_values.pct_change(periods=5, fill_method=None).iloc[-1]
+        monthly_return = close_values.pct_change(periods=20, fill_method=None).iloc[-1]
+        quarterly_return = close_values.pct_change(periods=60, fill_method=None).iloc[-1]
+        yearly_return = close_values.pct_change(periods=252, fill_method=None).iloc[-1]
         
-        # Retorno diário (último dia)
-        daily_return = stock_data['daily_return'].iloc[-1] * 100 if len(stock_data) > 1 else 0
-        
-        # Retorno semanal (últimos 5 dias úteis ou menos se não houver dados suficientes)
-        week_idx = min(6, len(stock_data))
-        weekly_return = ((stock_data['Close'].iloc[-1] / stock_data['Close'].iloc[-week_idx]) - 1) * 100 if len(stock_data) > 5 else 0
-        
-        # Retorno mensal (últimos 21 dias úteis ou menos se não houver dados suficientes)
-        month_idx = min(22, len(stock_data))
-        monthly_return = ((stock_data['Close'].iloc[-1] / stock_data['Close'].iloc[-month_idx]) - 1) * 100 if len(stock_data) > 21 else 0
-        
-        # Retorno anual ou máximo período disponível
-        yearly_return = ((stock_data['Close'].iloc[-1] / stock_data['Close'].iloc[0]) - 1) * 100
-        
+        # Converter para porcentagem e retornar
         return {
-            'daily': daily_return,
-            'weekly': weekly_return,
-            'monthly': monthly_return,
-            'yearly': yearly_return
+            'daily': float(daily_return * 100) if not pd.isna(daily_return) else 0.0,
+            'weekly': float(weekly_return * 100) if not pd.isna(weekly_return) else 0.0,
+            'monthly': float(monthly_return * 100) if not pd.isna(monthly_return) else 0.0,
+            'quarterly': float(quarterly_return * 100) if not pd.isna(quarterly_return) else 0.0,
+            'yearly': float(yearly_return * 100) if not pd.isna(yearly_return) else 0.0
         }
     except Exception as e:
-        print(f"Erro ao calcular retornos: {e}")
+        print(f"Erro ao calcular retornos: {str(e)}")
+        # Retornar valores vazios em caso de erro
         return {
-            'daily': 0,
-            'weekly': 0,
-            'monthly': 0,
-            'yearly': 0
+            'daily': 0.0,
+            'weekly': 0.0,
+            'monthly': 0.0,
+            'quarterly': 0.0,
+            'yearly': 0.0
         }
 
 def process_stock_thread(stock_code, results, index, stock_sectors, loading_screen=None):
     """Função para processar uma ação em uma thread separada"""
     try:
+        # Verificar se a ação está na lista de ignoradas
+        if stock_code in IGNORED_STOCKS:
+            if loading_screen:
+                loading_screen.log(f"Ignorando {stock_code} (ação deslistada ou com problemas conhecidos)")
+            return
+            
         if loading_screen:
             loading_screen.log(f"Processando {stock_code}")
         
@@ -377,6 +384,12 @@ def process_stock_thread(stock_code, results, index, stock_sectors, loading_scre
         if historical_data is None or historical_data.empty:
             return
         
+        # Verificar se temos uma série temporal suficiente
+        if len(historical_data) < 2:
+            if loading_screen:
+                loading_screen.log(f"Dados insuficientes para {stock_code}. Necessários pelo menos 2 dias de dados.")
+            return
+            
         # Calcular retornos
         returns = calculate_returns(historical_data)
         
@@ -388,17 +401,17 @@ def process_stock_thread(stock_code, results, index, stock_sectors, loading_scre
             'code': stock_code.replace('.SA', ''),
             'name': stock_code.replace('.SA', ''),
             'sector': stock_sectors.get(stock_code, 'Outros'),
-            'current_price': latest_data['Close'],
-            'open_price': latest_data['Open'],
-            'high_price': latest_data['High'],
-            'low_price': latest_data['Low'],
-            'close_price': latest_data['Close'],
-            'volume': latest_data['Volume'],
+            'current_price': float(latest_data['Close']),
+            'open_price': float(latest_data['Open']),
+            'high_price': float(latest_data['High']),
+            'low_price': float(latest_data['Low']),
+            'close_price': float(latest_data['Close']),
+            'volume': float(latest_data['Volume']),
             'daily_return': returns['daily'],
             'weekly_return': returns['weekly'],
             'monthly_return': returns['monthly'],
             'yearly_return': returns['yearly'],
-            'ytd_return': ((latest_data['Close'] / historical_data['Close'].iloc[0]) - 1) * 100
+            'ytd_return': ((float(latest_data['Close']) / float(historical_data['Close'].iloc[0])) - 1) * 100 if len(historical_data) > 0 else 0.0
         }
         
         # Armazenar no array de resultados
@@ -407,6 +420,7 @@ def process_stock_thread(stock_code, results, index, stock_sectors, loading_scre
     except Exception as e:
         if loading_screen:
             loading_screen.log(f"Erro ao processar {stock_code}: {str(e)}")
+        print(f"Erro ao processar {stock_code}: {str(e)}")
 
 def get_stock_performance_data(loading_screen=None):
     """Versão otimizada para obter dados de desempenho das ações da B3"""
