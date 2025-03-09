@@ -6,6 +6,10 @@ import time
 import random
 import logging
 import requests
+import threading
+
+# Importar o gerenciador de cache
+from .stock_cache import StockDataCache
 
 # Configurar logging
 logging.getLogger('yfinance').setLevel(logging.ERROR)
@@ -263,6 +267,7 @@ def get_stock_sectors():
         print(f"Erro ao mapear setores: {e}")
         return {}
 
+# Modificar a função fetch_stock_data para buscar apenas dados necessários
 def fetch_stock_data(stock_code, max_retries=3, loading_screen=None):
     """Obtém dados históricos de uma ação específica com mecanismo de retry"""
     retries = 0
@@ -273,24 +278,20 @@ def fetch_stock_data(stock_code, max_retries=3, loading_screen=None):
     
     while retries < max_retries:
         try:
-            # Adicionar delay aleatório para evitar bloqueios de API
-            time.sleep(0.5 + random.random())
+            # Reduzir delay para melhorar performance
+            time.sleep(0.2)  # Reduzido de 0.5 + random
             
-            # Define o período de um ano até hoje
+            # Define o período mais curto (3 meses é suficiente para a maioria das métricas)
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=365)
+            start_date = end_date - timedelta(days=90)  # Reduzido de 365 para 90 dias
             
-            # Suprimir as mensagens de erro do yfinance
-            import logging
-            logging.getLogger('yfinance').setLevel(logging.ERROR)
-            
-            # Buscar dados usando yfinance
+            # Buscar dados usando yfinance - com período mais curto
             stock_data = yf.download(
                 stock_code, 
                 start=start_date, 
                 end=end_date, 
                 progress=False,
-                ignore_tz=True  # Ignora problemas de timezone
+                ignore_tz=True
             )
             
             if stock_data.empty:
@@ -365,101 +366,125 @@ def calculate_returns(stock_data):
             'yearly': 0
         }
 
+def process_stock_thread(stock_code, results, index, stock_sectors, loading_screen=None):
+    """Função para processar uma ação em uma thread separada"""
+    try:
+        if loading_screen:
+            loading_screen.log(f"Processando {stock_code}")
+        
+        # Obter dados históricos
+        historical_data = fetch_stock_data(stock_code, loading_screen=loading_screen)
+        if historical_data is None or historical_data.empty:
+            return
+        
+        # Calcular retornos
+        returns = calculate_returns(historical_data)
+        
+        # Extrair dados do último dia
+        latest_data = historical_data.iloc[-1]
+        
+        # Criar dicionário com dados da ação
+        stock_data = {
+            'code': stock_code.replace('.SA', ''),
+            'name': stock_code.replace('.SA', ''),
+            'sector': stock_sectors.get(stock_code, 'Outros'),
+            'current_price': latest_data['Close'],
+            'open_price': latest_data['Open'],
+            'high_price': latest_data['High'],
+            'low_price': latest_data['Low'],
+            'close_price': latest_data['Close'],
+            'volume': latest_data['Volume'],
+            'daily_return': returns['daily'],
+            'weekly_return': returns['weekly'],
+            'monthly_return': returns['monthly'],
+            'yearly_return': returns['yearly'],
+            'ytd_return': ((latest_data['Close'] / historical_data['Close'].iloc[0]) - 1) * 100
+        }
+        
+        # Armazenar no array de resultados
+        results[index] = stock_data
+        
+    except Exception as e:
+        if loading_screen:
+            loading_screen.log(f"Erro ao processar {stock_code}: {str(e)}")
+
 def get_stock_performance_data(loading_screen=None):
-    """Obtém dados de desempenho para as principais ações da B3"""
-    sectors = get_stock_sectors()
+    """Versão otimizada para obter dados de desempenho das ações da B3"""
+    # Inicializar gerenciador de cache
+    cache = StockDataCache()
     
-    performance_data = []
-    
-    # Processar todas as ações, organizadas em lotes
-    stock_codes_with_sectors = list(sectors.keys())
-    
-    batch_size = 15
-    total_batches = (len(stock_codes_with_sectors) + batch_size - 1) // batch_size
-    
-    log_message = f"Buscando dados para {len(stock_codes_with_sectors)} ações..."
-    print(log_message)
+    # Tentar carregar do cache primeiro
     if loading_screen:
-        loading_screen.log(log_message)
+        loading_screen.log("Verificando dados em cache...")
     
-    successful_stocks = 0
-    failed_stocks = []
+    cached_data = cache.get_cached_data()
+    if cached_data is not None:
+        if loading_screen:
+            loading_screen.log(f"Dados encontrados em cache: {len(cached_data)} ações")
+            loading_screen.update_progress(100, 100)
+        return cached_data
+
+    if loading_screen:
+        loading_screen.log("Cache não disponível ou expirado. Buscando dados atualizados...")
     
     try:
-        for batch_idx in range(total_batches):
-            start_idx = batch_idx * batch_size
-            end_idx = min((batch_idx + 1) * batch_size, len(stock_codes_with_sectors))
-            current_batch = stock_codes_with_sectors[start_idx:end_idx]
-            
-            log_message = f"Processando lote {batch_idx + 1} de {total_batches} ({start_idx+1}-{end_idx} de {len(stock_codes_with_sectors)})"
-            print(log_message)
-            if loading_screen:
-                loading_screen.log(log_message)
-                
-            # Atualizar o progresso
-            if loading_screen:
-                loading_screen.update_progress(batch_idx + 1, total_batches)
-            
-            for stock_code in current_batch:
-                try:
-                    # Remover o sufixo .SA para exibição no dashboard
-                    display_code = stock_code.replace('.SA', '')
-                    
-                    log_message = f"Obtendo dados para {display_code}..."
-                    print(log_message)
-                    if loading_screen:
-                        loading_screen.log(log_message)
-                        
-                    stock_data = fetch_stock_data(stock_code, loading_screen=loading_screen)
-                    if stock_data is not None and not stock_data.empty:
-                        returns = calculate_returns(stock_data)
-                        
-                        # Adicionar ao dataframe de resultados
-                        sector = sectors.get(stock_code, 'Outros')
-                        performance_data.append({
-                            'code': display_code,  # Exibe código sem .SA
-                            'sector': sector,
-                            'current_price': stock_data['Close'].iloc[-1],
-                            'daily_return': returns['daily'],
-                            'weekly_return': returns['weekly'],
-                            'monthly_return': returns['monthly'],
-                            'yearly_return': returns['yearly']
-                        })
-                        log_message = f"Dados processados com sucesso para {display_code}"
-                        print(log_message)
-                        if loading_screen:
-                            loading_screen.log(log_message)
-                        successful_stocks += 1
-                    else:
-                        failed_stocks.append(display_code)
-                except Exception as e:
-                    log_message = f"Erro processando ação {stock_code.replace('.SA', '')}: {e}"
-                    print(log_message)
-                    if loading_screen:
-                        loading_screen.log(log_message)
-                    failed_stocks.append(stock_code.replace('.SA', ''))
-    except Exception as e:
-        # Capturar exceções gerais durante o processamento em lote
-        log_message = f"Erro durante o processamento: {e}"
-        print(log_message)
-        if loading_screen:
-            loading_screen.log(log_message)
-    
-    # Resumo final
-    log_message = f"\nProcessamento concluído: {successful_stocks} ações com sucesso, {len(failed_stocks)} falhas."
-    print(log_message)
-    if loading_screen:
-        loading_screen.log(log_message)
+        # Obter lista de ações - limite o número para melhorar a performance
+        stock_sectors = get_stock_sectors()
         
-    if failed_stocks:
-        log_message = f"Ações com falha: {', '.join(failed_stocks)}"
-        print(log_message)
+        # Obter apenas as ações mais importantes - limite a 50 ou 100 para melhor desempenho
+        # Você pode priorizar as ações mais líquidas do Ibovespa
+        stock_list = list(stock_sectors.keys())[:100]  # Limitar a 100 ações
+        
         if loading_screen:
-            loading_screen.log(log_message)
-    
-    # Atualizar progresso para 100% ao finalizar
-    if loading_screen:
-        loading_screen.update_progress(total_batches, total_batches)
-    
-    # SEMPRE retornar um DataFrame, mesmo que vazio
-    return pd.DataFrame(performance_data)
+            loading_screen.log(f"Lista de ações obtida: {len(stock_list)} ações")
+        
+        # Processar ações em lotes
+        batch_size = 5  # Processar 5 ações por vez
+        batches = [stock_list[i:i+batch_size] for i in range(0, len(stock_list), batch_size)]
+        
+        all_data = []
+        total_processed = 0
+        
+        for batch_idx, batch in enumerate(batches):
+            batch_data = []
+            # Criar threads para processamento paralelo do lote
+            threads = []
+            results = [None] * len(batch)
+            
+            for i, stock_code in enumerate(batch):
+                # Criar thread para cada ação no lote
+                t = threading.Thread(
+                    target=process_stock_thread, 
+                    args=(stock_code, results, i, stock_sectors, loading_screen)
+                )
+                threads.append(t)
+                t.start()
+            
+            # Esperar todas as threads terminarem
+            for t in threads:
+                t.join()
+            
+            # Adicionar resultados válidos aos dados
+            for result in results:
+                if result:
+                    all_data.append(result)
+            
+            total_processed += len(batch)
+            if loading_screen:
+                loading_screen.update_progress(total_processed, len(stock_list))
+        
+        # Criar DataFrame com todos os dados
+        performance_data = pd.DataFrame(all_data)
+        
+        # Salvar no cache após obter os dados
+        if performance_data is not None and not performance_data.empty:
+            cache.save_data_to_cache(performance_data)
+            if loading_screen:
+                loading_screen.log(f"Dados salvos em cache: {len(performance_data)} ações")
+        
+        return performance_data
+        
+    except Exception as e:
+        if loading_screen:
+            loading_screen.log(f"Erro ao buscar dados: {str(e)}")
+        return None
