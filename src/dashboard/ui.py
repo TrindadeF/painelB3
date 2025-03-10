@@ -15,14 +15,9 @@ class BrazilStocksDashboard:
         self.master.title("Dashboard de Ações Brasileiras - B3")
         self.master.geometry("1280x800")
         
-        self.comparison_stocks = []  # Ações selecionadas para comparação
-        self.filter_text = ""        # Texto para filtrar ações
+        # Remover self.filter_text que não será mais usado
         self.sort_column = ""        # Coluna atual de ordenação
         self.sort_ascending = True   # Direção da ordenação
-        
-        # Inicializar variáveis de paginação
-        self.current_page = 0
-        self.rows_per_page = 20
         
         # Criar um estilo personalizado para os cabeçalhos das colunas
         style = ttk.Style()
@@ -31,7 +26,7 @@ class BrazilStocksDashboard:
         self.create_widgets()
         
     def create_widgets(self):
-        """Cria todos os widgets do dashboard"""
+        """Cria todos os widgets do dashboard - versão simplificada sem comparação"""
         # Frame principal com divisão em painéis
         main_paned = ttk.PanedWindow(self.master, orient=tk.HORIZONTAL)
         main_paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -52,40 +47,12 @@ class BrazilStocksDashboard:
         ttk.Label(controls_frame, text="Dashboard de Ações da B3", 
                  font=("Arial", 14, "bold")).pack(pady=10)
         
-        # Frame para filtro de texto
-        filter_frame = ttk.Frame(controls_frame)
-        filter_frame.pack(fill=tk.X, padx=5, pady=5)
+        # REMOVER TODO O CÓDIGO DE FILTRO DE TEXTO ANTIGO
         
-        ttk.Label(filter_frame, text="Filtrar:").pack(side=tk.LEFT, padx=(0, 5))
-        self.filter_entry = ttk.Entry(filter_frame, width=30)
-        self.filter_entry.pack(side=tk.LEFT, padx=5)
-        self.filter_entry.bind("<Return>", lambda e: self.apply_filter())
+        # Adicionar o novo filtro de setor
+        self.setup_sector_filter(controls_frame)
         
-        ttk.Button(filter_frame, text="Aplicar Filtro", command=self.apply_filter).pack(side=tk.LEFT, padx=5)
-        ttk.Button(filter_frame, text="Limpar Filtro", command=self.clear_filter).pack(side=tk.LEFT, padx=5)
-        
-        # Frame para filtro de setor
-        sector_frame = ttk.Frame(controls_frame)
-        sector_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        ttk.Label(sector_frame, text="Setor:").pack(side=tk.LEFT, padx=(0, 5))
-        
-        sectors = ['Todos'] + sorted(self.performance_data['sector'].unique().tolist())
-        self.sector_var = tk.StringVar(value='Todos')
-        sector_combobox = ttk.Combobox(sector_frame, textvariable=self.sector_var, values=sectors, width=25, state="readonly")
-        sector_combobox.pack(side=tk.LEFT, padx=5)
-        sector_combobox.bind("<<ComboboxSelected>>", lambda e: self.apply_filter())
-        
-        # Frame para botões de ações
-        action_frame = ttk.Frame(controls_frame)
-        action_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        ttk.Button(action_frame, text="Comparar Selecionadas", 
-                  command=self.compare_selected_stocks).pack(side=tk.LEFT, padx=5)
-        ttk.Button(action_frame, text="Limpar Seleção", 
-                  command=self.clear_selection).pack(side=tk.LEFT, padx=5)
-        
-        # Adicionar botão de limpar cache no frame de ações
+        # Adicionar botão de limpar cache
         cache_frame = ttk.Frame(controls_frame)
         cache_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -109,103 +76,18 @@ class BrazilStocksDashboard:
         self.setup_scrollable_stock_table()
         
         # Frame para gráficos
-        self.charts_frame = ttk.LabelFrame(right_frame, text="Gráficos e Comparativos")
+        self.charts_frame = ttk.LabelFrame(right_frame, text="Gráficos de Rentabilidade")
         self.charts_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Inicializar área de gráficos
         self.create_charts_area(self.charts_frame)
-        
-    def create_stock_table(self, parent):
-        """Cria a tabela de ações com paginação"""
-        # Criar frame para tabela e scrollbar
-        table_container = ttk.Frame(parent)
-        table_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Scrollbars
-        y_scrollbar = ttk.Scrollbar(table_container)
-        y_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        x_scrollbar = ttk.Scrollbar(table_container, orient=tk.HORIZONTAL)
-        x_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
-        
-        # Tabela de ações
-        columns = ('code', 'sector', 'price', 'daily', 'weekly', 'monthly', 'yearly')
-        self.stocks_table = ttk.Treeview(
-            table_container, 
-            columns=columns,
-            show='headings',
-            yscrollcommand=y_scrollbar.set,
-            xscrollcommand=x_scrollbar.set,
-            height=15
-        )
-        
-        # Configurar cabeçalhos
-        self.stocks_table.heading('code', text='Código', anchor=tk.W, 
-                                  command=lambda: self.sort_by_column('code'))
-        self.stocks_table.heading('sector', text='Setor', anchor=tk.W,
-                                  command=lambda: self.sort_by_column('sector'))
-        self.stocks_table.heading('price', text='Preço', anchor=tk.E,
-                                  command=lambda: self.sort_by_column('current_price'))
-        self.stocks_table.heading('daily', text='Diário', anchor=tk.E,
-                                  command=lambda: self.sort_by_column('daily_return'))
-        self.stocks_table.heading('weekly', text='Semanal', anchor=tk.E,
-                                  command=lambda: self.sort_by_column('weekly_return'))
-        self.stocks_table.heading('monthly', text='Mensal', anchor=tk.E,
-                                  command=lambda: self.sort_by_column('monthly_return'))
-        self.stocks_table.heading('yearly', text='Anual', anchor=tk.E,
-                                  command=lambda: self.sort_by_column('yearly_return'))
-        
-        # Configurar colunas
-        self.stocks_table.column('code', width=80, anchor=tk.W)
-        self.stocks_table.column('sector', width=120, anchor=tk.W)
-        self.stocks_table.column('price', width=80, anchor=tk.E)
-        self.stocks_table.column('daily', width=80, anchor=tk.E)
-        self.stocks_table.column('weekly', width=80, anchor=tk.E)
-        self.stocks_table.column('monthly', width=80, anchor=tk.E)
-        self.stocks_table.column('yearly', width=80, anchor=tk.E)
-        
-        # Configurar as tags para colorizar
-        self.stocks_table.tag_configure('positive', background='#d4ffda')
-        self.stocks_table.tag_configure('negative', background='#ffd4d4')
-        self.stocks_table.tag_configure('selected', background='#d4d4ff')
-        
-        # Vincular scrollbars
-        y_scrollbar.config(command=self.stocks_table.yview)
-        x_scrollbar.config(command=self.stocks_table.xview)
-        
-        # Posicionar tabela
-        self.stocks_table.pack(fill=tk.BOTH, expand=True)
-        
-        # Vincular eventos de seleção
-        self.stocks_table.bind("<Double-1>", self.on_stock_selected)
-        self.stocks_table.bind("<Return>", self.on_stock_selected)
-        
-        # Frame para paginação
-        pagination_frame = ttk.Frame(parent)
-        pagination_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        # Botões de navegação
-        nav_frame = ttk.Frame(pagination_frame)
-        nav_frame.pack(pady=5)
-        
-        ttk.Button(nav_frame, text="<<", command=self.go_to_first_page).pack(side=tk.LEFT, padx=2)
-        ttk.Button(nav_frame, text="<", command=self.go_to_prev_page).pack(side=tk.LEFT, padx=2)
-        
-        # Inicializar self.page_label
-        self.page_label = ttk.Label(nav_frame, text="Página 1 de 1")
-        self.page_label.pack(side=tk.LEFT, padx=10)
-        
-        ttk.Button(nav_frame, text=">", command=self.go_to_next_page).pack(side=tk.LEFT, padx=2)
-        ttk.Button(nav_frame, text=">>", command=self.go_to_last_page).pack(side=tk.LEFT, padx=2)
-        
-        # Finalmente, carrega os dados na tabela
-        self.load_stock_data()
+    
 
     def create_charts_area(self, parent):
-        """Cria área simples para exibição de gráficos"""
+        """Cria área simples para exibição de gráficos - versão sem comparação"""
         # Texto de instruções
         ttk.Label(parent, 
-                 text="Dê duplo clique em uma ação para ver sua rentabilidade",
+                 text="Clique em uma ação para ver sua rentabilidade",
                  font=("Arial", 12)).pack(pady=10)
         
         # Frame para exibir gráficos
@@ -214,507 +96,374 @@ class BrazilStocksDashboard:
         
         # Mensagem inicial
         ttk.Label(self.chart_display, 
-                 text="Selecione uma ação (duplo clique) para ver o gráfico de rentabilidade",
+                 text="Selecione uma ação na tabela para ver o gráfico de rentabilidade",
                  font=("Arial", 12)).pack(pady=50)
+        
+        # Adicionar um botão alternativo para exibir gráfico (além do duplo clique)
+        view_button_frame = ttk.Frame(parent)
+        view_button_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(view_button_frame, 
+                  text="Exibir Gráfico da Ação Selecionada",
+                  command=self.show_selected_stock_graph).pack(side=tk.LEFT, padx=5)
+        
+        # Adicionar informação sobre atalhos
+        ttk.Label(view_button_frame, 
+                 text="Atalho: Enter = Exibir Gráfico",
+                 font=("Arial", 8)).pack(side=tk.RIGHT, padx=10)
 
-    def show_period_performance(self, period_column):
-        """Mostra gráfico de rentabilidade para o período selecionado"""
-        # Limpar área de gráficos
-        for widget in self.chart_display.winfo_children():
-            widget.destroy()
+        
+    def get_filtered_data(self):
+        """Retorna os dados filtrados apenas por setor - versão completamente reescrita"""
+        data = self.performance_data.copy()
+        
+        # Verificar se há dados
+        if data.empty:
+            print("Aviso: Conjunto de dados vazio")
+            return data
+        
+        # Registrar o total de linhas antes da filtragem
+        total_rows = len(data)
+        print(f"Total de linhas antes do filtro de setor: {total_rows}")
+        
+        # Aplicar filtro de setor se não for "Todos"
+        if hasattr(self, 'sector_var') and self.sector_var.get() != 'Todos':
+            selected_sector = self.sector_var.get()
+            print(f"Filtrando pelo setor: '{selected_sector}'")
+            
+            # Verificar se a coluna sector existe
+            if 'sector' not in data.columns:
+                print("Erro: coluna 'sector' não encontrada nos dados")
+                return data
+            
+            # DEBUG: Mostrar alguns setores da base para comparação
+            sample_sectors = data['sector'].dropna().unique()[:5]
+            print(f"Amostra de setores na base: {sample_sectors}")
+            
+            # Normalizar valores para comparação - crucial para correspondência exata
+            data['normalized_sector'] = data['sector'].fillna('').astype(str).str.strip()
+            normalized_selected = selected_sector.strip()
+            
+            # Aplicar filtro com correspondência exata
+            filtered_data = data[data['normalized_sector'] == normalized_selected].copy()
+            
+            # Se não encontrar resultados, tentar correspondência parcial
+            if filtered_data.empty:
+                print(f"Nenhum resultado com correspondência exata para '{selected_sector}'")
+                # Tentar correspondência parcial (contains)
+                filtered_data = data[data['normalized_sector'].str.contains(normalized_selected, case=False, na=False)].copy()
+            
+            # Remover coluna temporária 
+            if 'normalized_sector' in filtered_data.columns:
+                filtered_data.drop('normalized_sector', axis=1, inplace=True)
+            
+            if 'normalized_sector' in data.columns:
+                data.drop('normalized_sector', axis=1, inplace=True)
+            
+            # Resultado final
+            num_filtered = len(filtered_data)
+            print(f"Filtro aplicado: {num_filtered} de {total_rows} ações no setor '{selected_sector}'")
+            
+            # Se não encontrou nada, mostrar alerta
+            if num_filtered == 0:
+                print(f"ALERTA: Nenhuma ação encontrada para o setor '{selected_sector}'")
+                print(f"Setores disponíveis: {data['sector'].dropna().unique()}")
+            
+            return filtered_data
+        
+        # Se não há filtro, retornar todos os dados
+        return data
+    
+    def apply_filter(self):
+        """Aplica os filtros atuais e atualiza a interface - versão revisada"""
+        # Atualizar status antes de aplicar o filtro
+        status_label = ttk.Label(
+            self.scrollable_frame, 
+            text="Aplicando filtros...", 
+            font=("Arial", 10, "italic")
+        )
+        status_label.grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        self.scrollable_frame.update_idletasks()
+        
+        # Obter texto do filtro
+        self.filter_text = self.filter_entry.get().strip()
+        selected_sector = self.sector_var.get()
+        
+        print(f"Aplicando filtros - Texto: '{self.filter_text}', Setor: '{selected_sector}'")
+        
+        # Limpar widgets existentes exceto cabeçalhos
+        for widget in self.scrollable_frame.winfo_children():
+            if hasattr(widget, 'grid_info') and widget.grid_info():
+                if int(widget.grid_info().get('row', 0)) > 0:  # Preservar cabeçalhos (linha 0)
+                    widget.destroy()
         
         # Obter dados filtrados
         filtered_data = self.get_filtered_data()
         
-        # Aplicar filtro de performance se necessário
-        perf_filter = self.performance_filter.get()
-        if perf_filter == "Positivos":
-            filtered_data = filtered_data[filtered_data[period_column] > 0]
-        elif perf_filter == "Negativos":
-            filtered_data = filtered_data[filtered_data[period_column] < 0]
-        elif perf_filter == "Top 10":
-            filtered_data = filtered_data.nlargest(10, period_column)
-        elif perf_filter == "Bottom 10":
-            filtered_data = filtered_data.nsmallest(10, period_column)
-        elif perf_filter == "Top 20":
-            filtered_data = filtered_data.nlargest(20, period_column)
-        elif perf_filter == "Bottom 20":
-            filtered_data = filtered_data.nsmallest(20, period_column)
-        
-        # Se não houver dados após filtro
+        # Atualizar interface com resultado da filtragem
         if filtered_data.empty:
-            ttk.Label(self.chart_display, 
-                     text="Nenhum dado disponível para o filtro selecionado",
-                     font=("Arial", 12)).pack(pady=50)
+            ttk.Label(
+                self.scrollable_frame, 
+                text=f"Nenhum resultado para: Texto='{self.filter_text}', Setor='{selected_sector}'", 
+                font=("Arial", 12)
+            ).grid(row=1, column=0, columnspan=13, padx=10, pady=30)
             return
         
-        # Aplicar ordenação
-        sort_option = self.chart_sort.get()
-        if sort_option == "Maior Rentabilidade":
-            sorted_data = filtered_data.sort_values(by=period_column, ascending=False)
-        elif sort_option == "Menor Rentabilidade":
-            sorted_data = filtered_data.sort_values(by=period_column, ascending=True)
-        else:  # Alfabética
-            sorted_data = filtered_data.sort_values(by='code')
-        
-        # Criar figura para o gráfico
-        fig = plt.Figure(figsize=(10, 6), dpi=100)
-        ax = fig.add_subplot(111)
-        
-        # Título baseado no período
-        period_titles = {
-            "daily_return": "Rentabilidade Diária",
-            "monthly_return": "Rentabilidade Mensal",
-            "quarterly_return": "Rentabilidade Trimestral",
-            "yearly_return": "Rentabilidade Anual",
-            "ytd_return": "Rentabilidade do Ano Atual (YTD)"
-        }
-        
-        title = period_titles.get(period_column, "Rentabilidade")
-        
-        # Preparar dados para o gráfico
-        tickers = sorted_data['code'].tolist()
-        returns = sorted_data[period_column].tolist()
-        
-        # Cores com base no valor (positivo/negativo)
-        colors = ['green' if x > 0 else 'red' for x in returns]
-        
-        # Criar barras
-        bars = ax.bar(tickers, returns, color=colors, alpha=0.7)
-        
-        # Adicionar valores no topo das barras para melhor visualização
-        for i, bar in enumerate(bars):
-            height = bar.get_height()
-            if height >= 0:
-                va = 'bottom'
-                offset = 0.3
-            else:
-                va = 'top'
-                offset = -0.8
-                
-            # Evitar mostrar muitos valores quando há muitas barras
-            if len(bars) <= 30:  
-                ax.text(bar.get_x() + bar.get_width()/2., height + offset,
-                       f'{returns[i]:.1f}%',
-                       ha='center', va=va, rotation=90, fontsize=8)
-        
-        # Configurar eixos e títulos
-        ax.set_title(title, fontsize=14)
-        ax.set_ylabel('Rentabilidade (%)', fontsize=12)
-        ax.set_xlabel('Ações', fontsize=12)
-        
-        # Rotacionar labels do eixo x para melhor visualização
-        plt.setp(ax.get_xticklabels(), rotation=90, ha='center', fontsize=8)
-        
-        # Adicionar grade para facilitar a leitura
-        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
-        
-        # Linha de zero para referência
-        ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
-        
-        # Ajustar layout
-        fig.tight_layout()
-        
-        # Colocar gráfico no frame
-        canvas = FigureCanvasTkAgg(fig, master=self.chart_display)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Adicionar barra de ferramentas para navegação
-        toolbar_frame = ttk.Frame(self.chart_display)
-        toolbar_frame.pack(fill=tk.X, padx=5)
-        toolbar = NavigationToolbar2Tk(canvas, toolbar_frame)
-        toolbar.update()
-        
-        # Adicionar estatísticas
-        self.add_chart_statistics(period_column, filtered_data)
-
-    def add_chart_statistics(self, period_column, data):
-        """Adiciona estatísticas sobre o período selecionado"""
-        stats_frame = ttk.LabelFrame(self.chart_display, text="Estatísticas")
-        stats_frame.pack(fill=tk.X, padx=5, pady=10)
-        
-        # Calcular estatísticas
-        total_stocks = len(data)
-        positives = len(data[data[period_column] > 0])
-        negatives = len(data[data[period_column] < 0])
-        neutral = total_stocks - positives - negatives
-        
-        avg_return = data[period_column].mean()
-        max_return = data[period_column].max()
-        min_return = data[period_column].min()
-        
-        top_performer = data.loc[data[period_column].idxmax()]['code'] if not data.empty else "N/A"
-        worst_performer = data.loc[data[period_column].idxmin()]['code'] if not data.empty else "N/A"
-        
-        # Criar grid para estatísticas
-        ttk.Label(stats_frame, text=f"Total de Ações: {total_stocks}", font=("Arial", 9, "bold")).grid(
-            row=0, column=0, padx=10, pady=5, sticky="w")
-        
-        ttk.Label(stats_frame, text=f"Positivas: {positives} ({positives/total_stocks*100:.1f}%)", 
-                  foreground="green").grid(row=0, column=1, padx=10, pady=5, sticky="w")
-        
-        ttk.Label(stats_frame, text=f"Negativas: {negatives} ({negatives/total_stocks*100:.1f}%)", 
-                  foreground="red").grid(row=0, column=2, padx=10, pady=5, sticky="w")
-        
-        ttk.Label(stats_frame, text=f"Média: {avg_return:.2f}%",
-                  foreground="green" if avg_return > 0 else "red" if avg_return < 0 else "black").grid(
-                      row=1, column=0, padx=10, pady=5, sticky="w")
-        
-        ttk.Label(stats_frame, text=f"Máximo: {max_return:.2f}% ({top_performer})",
-                  foreground="green").grid(row=1, column=1, padx=10, pady=5, sticky="w")
-        
-        ttk.Label(stats_frame, text=f"Mínimo: {min_return:.2f}% ({worst_performer})",
-                  foreground="red").grid(row=1, column=2, padx=10, pady=5, sticky="w")
-
-    def on_stock_selected(self, event):
-        """Adiciona ou remove uma ação da lista de comparação"""
-        selection = self.stocks_table.selection()
-        if not selection:
-            return
-            
-        item = selection[0]
-        values = self.stocks_table.item(item, 'values')
-        stock_code = values[0]  # Código da ação está na primeira coluna
-        
-        # Toggle seleção
-        if stock_code in self.comparison_stocks:
-            self.comparison_stocks.remove(stock_code)
-            self.stocks_table.item(item, tags=())  # Remove tag selecionada
-        else:
-            if len(self.comparison_stocks) >= 5:
-                messagebox.showinfo("Limite atingido", "Você pode comparar até 5 ações simultaneamente.")
-                return
-            
-            self.comparison_stocks.append(stock_code)
-            
-            # Adicionar tag visual para mostrar que está selecionada
-            current_tags = list(self.stocks_table.item(item, "tags"))
-            if 'positive' in current_tags:
-                self.stocks_table.item(item, tags=('positive', 'selected'))
-            elif 'negative' in current_tags:
-                self.stocks_table.item(item, tags=('negative', 'selected'))
-            else:
-                self.stocks_table.item(item, tags=('selected',))
-        
-        # Atualizar status
-        status = f"Ações selecionadas: {', '.join(self.comparison_stocks)}"
-        print(status)  # Pode ser substituído por uma barra de status na UI
-        
-        # Se houver ações selecionadas, mostra botão de comparação
-        if self.comparison_stocks:
-            self.update_chart_preview()
-    
-    def update_chart_preview(self):
-        """Mostra uma prévia do gráfico de comparação"""
-        # Limpar área de gráficos
-        for widget in self.chart_display.winfo_children():
-            widget.destroy()
-        
-        if not self.comparison_stocks:
-            ttk.Label(self.chart_display, 
-                     text="Selecione ações para ver comparativos",
-                     font=("Arial", 12, "bold")).pack(pady=50)
-            return
-        
-        # Mostrar quais ações estão selecionadas
-        selection_text = f"Ações selecionadas: {', '.join(self.comparison_stocks)}"
-        ttk.Label(self.chart_display, text=selection_text).pack(pady=5)
-        
-        # Botão para gerar comparativo completo
-        ttk.Button(self.chart_display, text="Gerar Comparativo Detalhado", 
-                  command=self.compare_selected_stocks).pack(pady=10)
-    
-    def compare_selected_stocks(self):
-        """Gera gráficos comparativos entre as ações selecionadas"""
-        if not self.comparison_stocks:
-            messagebox.showinfo("Sem seleção", "Selecione pelo menos uma ação para comparar.")
-            return
-        
-        # Limpar área de gráficos
-        for widget in self.chart_display.winfo_children():
-            widget.destroy()
-        
-        # Criar notebook para diferentes tipos de comparação
-        notebook = ttk.Notebook(self.chart_display)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Tab para preços
-        price_tab = ttk.Frame(notebook)
-        notebook.add(price_tab, text="Evolução de Preços")
-        
-        # Adicionar canvas com gráfico de preços
-        price_chart = create_comparison_chart(self.comparison_stocks, price_tab)
-        if price_chart:
-            price_chart.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Verificar quais colunas de retorno estão disponíveis
-        columns = self.performance_data.columns.tolist()
-        
-        # Tab para retorno anual - usando o nome correto da coluna
-        if 'yearly_return' in columns:
-            annual_tab = ttk.Frame(notebook)
-            notebook.add(annual_tab, text="Retorno Anual")
-            
-            annual_fig = create_return_comparison_chart(self.performance_data, 
-                                                     self.comparison_stocks, 
-                                                     'yearly_return')
-            if annual_fig:
-                annual_canvas = FigureCanvasTkAgg(annual_fig, annual_tab)
-                annual_canvas.draw()
-                annual_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-            
-        # Tab para retorno mensal - usando o nome correto da coluna
-        if 'monthly_return' in columns:
-            monthly_tab = ttk.Frame(notebook)
-            notebook.add(monthly_tab, text="Retorno Mensal")
-            
-            monthly_fig = create_return_comparison_chart(self.performance_data, 
-                                                      self.comparison_stocks, 
-                                                      'monthly_return')
-            if monthly_fig:
-                monthly_canvas = FigureCanvasTkAgg(monthly_fig, monthly_tab)
-                monthly_canvas.draw()
-                monthly_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Tab para retorno semanal
-        if 'weekly_return' in columns:
-            weekly_tab = ttk.Frame(notebook)
-            notebook.add(weekly_tab, text="Retorno Semanal")
-            
-            weekly_fig = create_return_comparison_chart(self.performance_data, 
-                                                     self.comparison_stocks, 
-                                                     'weekly_return')
-            if weekly_fig:
-                weekly_canvas = FigureCanvasTkAgg(weekly_fig, weekly_tab)
-                weekly_canvas.draw()
-                weekly_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Tab para retorno diário
-        if 'daily_return' in columns:
-            daily_tab = ttk.Frame(notebook)
-            notebook.add(daily_tab, text="Retorno Diário")
-            
-            daily_fig = create_return_comparison_chart(self.performance_data, 
-                                                   self.comparison_stocks, 
-                                                   'daily_return')
-            if daily_fig:
-                daily_canvas = FigureCanvasTkAgg(daily_fig, daily_tab)
-                daily_canvas.draw()
-                daily_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-    
-    def load_stock_data(self):
-        """Carrega os dados filtrados na tabela"""
-        # Aplicar filtros
-        filtered_data = self.get_filtered_data()
-        
-        # Limpar tabela atual
-        for item in self.stocks_frame.get_children():
-            self.stocks_frame.delete(item)
-            
-        # Calcular paginação
-        total_rows = len(filtered_data)
-        total_pages = max(1, (total_rows + self.rows_per_page - 1) // self.rows_per_page)
-        
-        # Ajustar página atual se necessário
-        if self.current_page >= total_pages:
-            self.current_page = max(0, total_pages - 1)
-        
-        # Selecionar dados para a página atual
-        start_idx = self.current_page * self.rows_per_page
-        end_idx = min(start_idx + self.rows_per_page, total_rows)
-        page_data = filtered_data.iloc[start_idx:end_idx]
-        
-        # Atualizar label de paginação se existir
-        if hasattr(self, 'page_label'):
-            self.page_label.config(text=f"Página {self.current_page + 1} de {total_pages}")
-        
-        # Preencher tabela
-        for _, row in page_data.iterrows():
-            try:
-                # Extrair valores individuais corretamente:
-                code = str(row['code']) if isinstance(row['code'], pd.Series) else str(row['code'])
-                sector = str(row['sector']) if isinstance(row['sector'], pd.Series) else str(row['sector'])
-                
-                # Usar .iloc[0] para Series ou o valor direto para escalares
-                price = float(row['current_price'].iloc[0]) if isinstance(row['current_price'], pd.Series) else float(row['current_price'])
-                daily = float(row['daily_return'].iloc[0]) if isinstance(row['daily_return'], pd.Series) else float(row['daily_return'])
-                weekly = float(row['weekly_return'].iloc[0]) if isinstance(row['weekly_return'], pd.Series) else float(row['weekly_return'])
-                monthly = float(row['monthly_return'].iloc[0]) if isinstance(row['monthly_return'], pd.Series) else float(row['monthly_return'])
-                yearly = float(row['yearly_return'].iloc[0]) if isinstance(row['yearly_return'], pd.Series) else float(row['yearly_return'])
-                
-                # Inserir na tabela com formatação apropriada
-                item_id = self.stocks_table.insert(
-                    "", 
-                    "end", 
-                    values=(
-                        code,
-                        sector,
-                        f"R$ {price:.2f}",
-                        f"{daily:.2f}%",
-                        f"{weekly:.2f}%",
-                        f"{monthly:.2f}%",
-                        f"{yearly:.2f}%"
-                    )
-                )
-                
-                # Definir tags para colorização
-                tags = []
-                if code in self.comparison_stocks:
-                    tags.append('selected')
-                
-                if daily > 0:
-                    tags.append('positive')
-                elif daily < 0:
-                    tags.append('negative')
-                    
-                if tags:
-                    self.stocks_table.item(item_id, tags=tuple(tags))
-            except Exception as e:
-                print(f"Erro ao processar linha: {e}")
-                # Continuar para a próxima linha em caso de erro
-                continue
-    
-    def get_filtered_data(self):
-        """Retorna os dados filtrados com base nos critérios atuais - versão corrigida"""
-        data = self.performance_data.copy()
-        
-        # Verificar valores válidos em 'code' para evitar erros
-        if 'code' not in data.columns:
-            print("Erro: coluna 'code' não encontrada nos dados")
-            return data
-        
-        # Registrar o total de linhas antes da filtragem
-        print(f"Total de linhas antes dos filtros: {len(data)}")
-        
-        # Aplicar filtro de texto se houver
+        # Mostrar resultados da filtragem
+        result_text = f"Encontrado(s) {len(filtered_data)} resultado(s)"
         if self.filter_text:
-            try:
-                # Garantir que o código seja string para usar str.contains
-                data['code'] = data['code'].astype(str)
-                mask = data['code'].str.contains(self.filter_text, case=False, na=False)
-                data = data[mask]
-                print(f"Após filtro de texto '{self.filter_text}': {len(data)} linhas")
-            except Exception as e:
-                print(f"Erro ao filtrar por texto: {e}")
+            result_text += f" para '{self.filter_text}'"
+        if selected_sector != 'Todos':
+            result_text += f" no setor '{selected_sector}'"
+            
+        ttk.Label(
+            self.scrollable_frame, 
+            text=result_text, 
+            font=("Arial", 9, "italic")
+        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
         
-        # Aplicar filtro de setor se não for "Todos" - VERSÃO CORRIGIDA
-        if hasattr(self, 'sector_var') and self.sector_var.get() != 'Todos':
-            try:
-                # Filtrar por setor selecionado (com tratamento de string)
-                selected_sector = self.sector_var.get().strip()
-                
-                # Garantir que ambas as strings sejam comparadas corretamente
-                if 'sector' in data.columns:
-                    # Converter para string e normalizar
-                    data['sector_norm'] = data['sector'].astype(str).str.strip()
-                    
-                    # Aplicar filtro e manter apenas linhas correspondentes
-                    data = data[data['sector_norm'] == selected_sector]
-                    
-                    # Remover coluna temporária
-                    if 'sector_norm' in data.columns:
-                        data = data.drop('sector_norm', axis=1)
-                    
-                    print(f"Após filtro de setor '{selected_sector}': {len(data)} linhas")
-                else:
-                    print("Coluna 'sector' não encontrada nos dados")
-            except Exception as e:
-                print(f"Erro ao filtrar por setor: {e}")
-                import traceback
-                traceback.print_exc()
-        
-        # Aplicar ordenação se definida
-        if self.sort_column and self.sort_column in data.columns:
-            try:
-                data = data.sort_values(by=self.sort_column, ascending=self.sort_ascending)
-            except Exception as e:
-                print(f"Erro ao ordenar por {self.sort_column}: {e}")
-        
-        return data
-    
-    def sort_by_column(self, column_name):
-        """Ordena os dados pela coluna especificada"""
-        if self.sort_column == column_name:
-            # Inverter direção se já estiver ordenando por esta coluna
-            self.sort_ascending = not self.sort_ascending
-        else:
-            # Nova coluna: ordenar ascendente inicialmente, exceto para retornos
-            if column_name in ['daily_return', 'weekly_return', 'monthly_return', 'yearly_return']:
-                self.sort_ascending = False
-            else:
-                self.sort_ascending = True
-                
-        self.sort_column = column_name
-        self.load_stock_data()
-    
-    def apply_filter(self):
-        """Aplica o filtro atual aos dados - versão corrigida"""
-        self.filter_text = self.filter_entry.get().strip()
-        
-        # Obter dados filtrados e atualizar a tabela
-        filtered_data = self.get_filtered_data()
-        
-        # Limpar widgets existentes exceto cabeçalhos
-        for widget in self.scrollable_frame.winfo_children():
-            if int(widget.grid_info()['row']) > 0:  # Preservar cabeçalhos (linha 0)
-                widget.destroy()
-        
-        # Ordenar por código para facilitar localização
+        # Ordenar e mostrar dados filtrados
         sorted_data = filtered_data.sort_values(by='code')
-        
-        # Mostrar status da filtragem
-        print(f"Filtro aplicado: {len(filtered_data)} ações encontradas")
-        
-        # Processar em lotes para melhor desempenho
-        self._populate_table_batch(sorted_data, 0, 50)
+        self._populate_table_batch(sorted_data, 1, 50, offset=1)  # Começar da linha 2 por causa do status
 
     def clear_filter(self):
-        """Limpa o filtro atual - versão aprimorada"""
+        """Limpa todos os filtros e restaura a visualização original - versão revisada"""
+        # Redefinir variáveis de filtro
         self.filter_text = ""
         self.filter_entry.delete(0, tk.END)
         self.sector_var.set("Todos")
-        self.populate_stock_table()  # Usar populate_stock_table em vez de load_stock_data
-    
-    def clear_selection(self):
-        """Limpa a seleção de ações para comparação"""
-        self.comparison_stocks = []
-        self.load_stock_data()
         
-        # Limpar área de gráficos
-        for widget in self.chart_display.winfo_children():
-            widget.destroy()
+        # Mostrar status de limpeza
+        status_label = ttk.Label(
+            self.scrollable_frame, 
+            text="Limpando filtros...", 
+            font=("Arial", 10, "italic")
+        )
+        status_label.grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        self.scrollable_frame.update_idletasks()
         
-        ttk.Label(self.chart_display, 
-                 text="Selecione ações para ver comparativos",
-                 font=("Arial", 12, "bold")).pack(pady=50)
+        # Limpar completamente a tabela (exceto cabeçalhos)
+        for widget in self.scrollable_frame.winfo_children():
+            if hasattr(widget, 'grid_info') and widget.grid_info():
+                if int(widget.grid_info().get('row', 0)) > 0:  # Preservar cabeçalhos (linha 0)
+                    widget.destroy()
+        
+        # Recarregar todos os dados
+        all_data = self.performance_data.copy()
+        
+        # Verificar se há dados
+        if all_data.empty:
+            ttk.Label(
+                self.scrollable_frame, 
+                text="Nenhum dado disponível", 
+                font=("Arial", 12)
+            ).grid(row=1, column=0, columnspan=13, padx=10, pady=10)
+            return
+        
+        # Exibir status de recarregamento
+        ttk.Label(
+            self.scrollable_frame, 
+            text=f"Mostrando todas as {len(all_data)} ações", 
+            font=("Arial", 9, "italic")
+        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        
+        # Ordenar e mostrar todos os dados
+        sorted_data = all_data.sort_values(by='code')
+        self._populate_table_batch(sorted_data, 1, 50, offset=1)  # Começar da linha 2 por causa do status
     
-    def go_to_first_page(self):
-        """Vai para a primeira página"""
-        if self.current_page > 0:
-            self.current_page = 0
-            self.load_stock_data()
-    
-    def go_to_prev_page(self):
-        """Vai para a página anterior"""
-        if self.current_page > 0:
-            self.current_page -= 1
-            self.load_stock_data()
-    
-    def go_to_next_page(self):
-        """Vai para a próxima página"""
-        total_pages = (len(self.get_filtered_data()) + self.rows_per_page - 1) // self.rows_per_page
-        if self.current_page < total_pages - 1:
-            self.current_page += 1
-            self.load_stock_data()
-    
-    def go_to_last_page(self):
-        """Vai para a última página"""
-        total_pages = (len(self.get_filtered_data()) + self.rows_per_page - 1) // self.rows_per_page
-        if self.current_page < total_pages - 1:
-            self.current_page = total_pages - 1
-            self.load_stock_data()
-    
+
+    def setup_sector_filter(self, parent_frame):
+        """Configura o filtro de setores - versão corrigida e simplificada"""
+        # Criar frame para alinhamento
+        filter_controls = ttk.Frame(parent_frame)
+        filter_controls.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Label para setor
+        ttk.Label(filter_controls, text="Setor:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Obter valores únicos de setores e garantir formatação consistente
+        sectors = []
+        
+        if 'sector' in self.performance_data.columns:
+            # Normalizar valores e remover duplicatas
+            sector_values = self.performance_data['sector'].dropna().unique()
+            sector_values = [str(s).strip() for s in sector_values if str(s).strip()]
+            sectors = ['Todos'] + sorted(set(sector_values))  # Usando set para garantir valores únicos
+            print(f"Setores disponíveis: {sectors}")
+        else:
+            sectors = ['Todos']
+            print("Aviso: Coluna 'sector' não encontrada nos dados")
+        
+        # Criar combobox de setores
+        self.sector_var = tk.StringVar(value='Todos')
+        self.sector_combobox = ttk.Combobox(
+            filter_controls,
+            textvariable=self.sector_var,
+            values=sectors,
+            width=30,
+            state="readonly"
+        )
+        self.sector_combobox.pack(side=tk.LEFT, padx=5)
+        
+        # Botões de filtro - Usar apenas o botão de mostrar todas
+        ttk.Button(filter_controls, 
+                  text="Mostrar Todas as Ações", 
+                  command=self.show_all_stocks).pack(side=tk.LEFT, padx=5)
+        
+        # IMPORTANTE: O binding correto
+        self.sector_combobox.bind("<<ComboboxSelected>>", self._on_sector_selected)
+
+    def _on_sector_selected(self, event=None):
+        """Função específica para tratar seleção de setor - versão corrigida"""
+        # Obter o valor diretamente do combobox em vez da variável
+        selected_sector = self.sector_combobox.get()  # Importante: usar get() diretamente do combobox
+        
+        print(f"Setor selecionado no combobox: '{selected_sector}'")
+        
+        # Forçar a atualização explícita da variável
+        self.sector_var.set(selected_sector)
+        
+        # Aplicar filtro após uma pequena pausa para garantir atualização da interface
+        self.master.after(50, lambda: self._apply_sector_filter_internal(selected_sector))
+
+    def _apply_sector_filter_internal(self, selected_sector):
+        """Método interno para aplicar o filtro com o setor específico"""
+        print(f"Aplicando filtro para setor: '{selected_sector}' (interno)")
+        
+        # Limpar tabela existente
+        for widget in self.scrollable_frame.winfo_children():
+            if hasattr(widget, 'grid_info') and widget.grid_info():
+                if int(widget.grid_info().get('row', 0)) > 0:
+                    widget.destroy()
+        
+        # Mostrar mensagem de carregamento
+        loading_label = ttk.Label(
+            self.scrollable_frame, 
+            text=f"Filtrando ações do setor: {selected_sector}...", 
+            font=("Arial", 10, "italic")
+        )
+        loading_label.grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        self.scrollable_frame.update()
+        
+        # Forçar a filtragem específica do setor selecionado
+        filtered_data = self.filter_by_specific_sector(selected_sector)
+        
+        # Limpar tabela novamente
+        for widget in self.scrollable_frame.winfo_children():
+            if hasattr(widget, 'grid_info') and widget.grid_info():
+                if int(widget.grid_info().get('row', 0)) > 0:
+                    widget.destroy()
+        
+        # Verificar resultado
+        if filtered_data.empty:
+            ttk.Label(
+                self.scrollable_frame, 
+                text=f"Nenhuma ação encontrada no setor '{selected_sector}'", 
+                font=("Arial", 12)
+            ).grid(row=1, column=0, columnspan=13, padx=10, pady=30)
+            return
+        
+        # Mensagem de resultado
+        result_text = f"Mostrando {len(filtered_data)} ações do setor '{selected_sector}'"
+        if selected_sector == 'Todos':
+            result_text = f"Mostrando todas as {len(filtered_data)} ações"
+        
+        ttk.Label(
+            self.scrollable_frame, 
+            text=result_text, 
+            font=("Arial", 9, "italic")
+        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        
+        # Preencher tabela com dados filtrados
+        sorted_data = filtered_data.sort_values(by='code')
+        self._populate_table_batch(sorted_data, 1, 100, offset=1)
+
+    def filter_by_specific_sector(self, selected_sector):
+        """Filtra os dados pelo setor específico sem depender de self.sector_var"""
+        data = self.performance_data.copy()
+        
+        # Verificar se há dados
+        if data.empty:
+            return data
+        
+        # Se for "Todos", retornar todos os dados
+        if selected_sector == 'Todos':
+            return data
+        
+        # Verificar se a coluna sector existe
+        if 'sector' not in data.columns:
+            print("Erro: coluna 'sector' não encontrada nos dados")
+            return data
+        
+        # DEBUG: Mostrar alguns setores para diagnóstico
+        print(f"Filtrando especificamente pelo setor: '{selected_sector}'")
+        unique_sectors = data['sector'].dropna().unique()
+        print(f"Setores disponíveis ({len(unique_sectors)}): {unique_sectors}")
+        
+        # Normalizar valores para comparação
+        data['normalized_sector'] = data['sector'].fillna('').astype(str).str.strip()
+        normalized_selected = selected_sector.strip()
+        
+        # Verificar cada linha para diagnóstico
+        sample_size = min(5, len(data))
+        sample_rows = data.sample(sample_size)
+        for idx, row in sample_rows.iterrows():
+            print(f"Amostra {row['code']}: setor={row['sector']}, normalizado={row['normalized_sector']}")
+        
+        # Aplicar filtro com correspondência exata
+        filtered_data = data[data['normalized_sector'] == normalized_selected].copy()
+        
+        # Remover coluna temporária
+        if 'normalized_sector' in filtered_data.columns:
+            filtered_data.drop('normalized_sector', axis=1, inplace=True)
+        
+        # Limpar original também
+        if 'normalized_sector' in data.columns:
+            data.drop('normalized_sector', axis=1, inplace=True)
+        
+        # Resultado final
+        print(f"Filtro específico aplicado: {len(filtered_data)} ações encontradas para setor '{selected_sector}'")
+        
+        return filtered_data
+
+    def show_all_stocks(self):
+        """Limpa o filtro de setor e mostra todas as ações"""
+        # Redefinir seleção de setor
+        self.sector_var.set("Todos")
+        
+        # Mostrar status
+        for widget in self.scrollable_frame.winfo_children():
+            if hasattr(widget, 'grid_info') and widget.grid_info():
+                if int(widget.grid_info().get('row', 0)) > 0:
+                    widget.destroy()
+        
+        ttk.Label(
+            self.scrollable_frame, 
+            text="Carregando todas as ações...", 
+            font=("Arial", 10, "italic")
+        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        self.scrollable_frame.update()
+        
+        # Obter todos os dados
+        all_data = self.performance_data.copy()
+        
+        # Limpar tabela novamente
+        for widget in self.scrollable_frame.winfo_children():
+            if hasattr(widget, 'grid_info') and widget.grid_info():
+                if int(widget.grid_info().get('row', 0)) > 0:
+                    widget.destroy()
+        
+        # Mostrar mensagem de resultado
+        ttk.Label(
+            self.scrollable_frame, 
+            text=f"Mostrando todas as {len(all_data)} ações", 
+            font=("Arial", 9, "italic")
+        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        
+        # Preencher tabela
+        sorted_data = all_data.sort_values(by='code')
+        self._populate_table_batch(sorted_data, 1, 100, offset=1)
+        
     def setup_scrollable_stock_table(self):
         """Versão otimizada da tabela de ações com rolagem mais suave"""
         # Container para tabela
@@ -831,17 +580,23 @@ class BrazilStocksDashboard:
         # Processar em lotes para melhor desempenho
         self._populate_table_batch(sorted_data, 0, 50)
 
-    def _populate_table_batch(self, data, start_idx, batch_size):
-        """Versão corrigida que preenche a tabela em lotes"""
+    def _populate_table_batch(self, data, start_idx, batch_size, offset=0):
+        """Versão corrigida que preenche a tabela em lotes com suporte a deslocamento (offset)"""
         end_idx = min(start_idx + batch_size, len(data))
         batch = data.iloc[start_idx:end_idx]
         
         for i, (_, row) in enumerate(batch.iterrows(), start_idx + 1):
+            # Calcular a linha real na grid considerando o offset
+            grid_row = i + offset
+            
             try:
                 # Obter dados básicos
                 ticker = str(row['code']) if 'code' in row else "N/A"
                 
-                # Obter valores com segurança usando o método safe_get_value
+                # Mostrar o setor para diagnóstico
+                sector_value = row['sector'] if 'sector' in row else "N/A"
+                
+                # Obter valores com segurança
                 price = self.safe_get_value(row, 'current_price')
                 open_price = self.safe_get_value(row, 'open_price')
                 low_price = self.safe_get_value(row, 'low_price')
@@ -858,33 +613,41 @@ class BrazilStocksDashboard:
                 yearly_change = self.safe_get_value(row, 'yearly_return')
                 ytd_change = self.safe_get_value(row, 'ytd_return')
                 
-                # Debug - imprimir valores para diagnosticar problemas
-                if i % 10 == 0:  # Imprimir a cada 10 linhas para não sobrecarregar
-                    print(f"Adicionando ação: {ticker}, preço: {price:.2f}, setor: {row.get('sector', 'N/A')}")
+                # Adicionar cada célula à tabela
+                ticker_label = ttk.Label(self.scrollable_frame, text=ticker)
+                ticker_label.grid(row=grid_row, column=0, padx=10, pady=2, sticky="w")
                 
-                # Adicionar cada célula à tabela com garantia contra erros
-                ttk.Label(self.scrollable_frame, text=ticker).grid(row=i, column=0, padx=10, pady=2, sticky="w")
-                ttk.Label(self.scrollable_frame, text=f"R$ {price:.2f}").grid(row=i, column=1, padx=10, pady=2, sticky="e")
+                # Adicionar tooltip com setor
+                self.add_tooltip(ticker_label, f"Setor: {sector_value}")
+                
+                ttk.Label(self.scrollable_frame, text=f"R$ {price:.2f}").grid(
+                    row=grid_row, column=1, padx=10, pady=2, sticky="e")
                 
                 # Adicionar demais campos
-                ttk.Label(self.scrollable_frame, text=f"R$ {open_price:.2f}").grid(row=i, column=2, padx=10, pady=2, sticky="e")
-                ttk.Label(self.scrollable_frame, text=f"R$ {low_price:.2f}").grid(row=i, column=3, padx=10, pady=2, sticky="e")
-                ttk.Label(self.scrollable_frame, text=f"R$ {high_price:.2f}").grid(row=i, column=4, padx=10, pady=2, sticky="e")
-                ttk.Label(self.scrollable_frame, text=f"R$ {close_price:.2f}").grid(row=i, column=5, padx=10, pady=2, sticky="e")
+                ttk.Label(self.scrollable_frame, text=f"R$ {open_price:.2f}").grid(
+                    row=grid_row, column=2, padx=10, pady=2, sticky="e")
+                ttk.Label(self.scrollable_frame, text=f"R$ {low_price:.2f}").grid(
+                    row=grid_row, column=3, padx=10, pady=2, sticky="e")
+                ttk.Label(self.scrollable_frame, text=f"R$ {high_price:.2f}").grid(
+                    row=grid_row, column=4, padx=10, pady=2, sticky="e")
+                ttk.Label(self.scrollable_frame, text=f"R$ {close_price:.2f}").grid(
+                    row=grid_row, column=5, padx=10, pady=2, sticky="e")
                 
-                # Formatação para volumes em milhões/milhares
+                # Formatação para volumes
                 vol_text = f"R$ {financial_volume/1_000_000:.2f}M" if financial_volume >= 1_000_000 else \
                          f"R$ {financial_volume/1_000:.2f}K" if financial_volume > 0 else "R$ 0.00"
                 
-                ttk.Label(self.scrollable_frame, text=vol_text).grid(row=i, column=6, padx=10, pady=2, sticky="e")
-                ttk.Label(self.scrollable_frame, text=f"{trades_volume:,.0f}").grid(row=i, column=7, padx=10, pady=2, sticky="e")
+                ttk.Label(self.scrollable_frame, text=vol_text).grid(
+                    row=grid_row, column=6, padx=10, pady=2, sticky="e")
+                ttk.Label(self.scrollable_frame, text=f"{trades_volume:,.0f}").grid(
+                    row=grid_row, column=7, padx=10, pady=2, sticky="e")
                 
                 # Formatar as variações com cores
-                self.create_change_label(self.scrollable_frame, daily_change, row=i, column=8)
-                self.create_change_label(self.scrollable_frame, monthly_change, row=i, column=9)
-                self.create_change_label(self.scrollable_frame, quarterly_change, row=i, column=10)
-                self.create_change_label(self.scrollable_frame, yearly_change, row=i, column=11)
-                self.create_change_label(self.scrollable_frame, ytd_change, row=i, column=12)
+                self.create_change_label(self.scrollable_frame, daily_change, row=grid_row, column=8)
+                self.create_change_label(self.scrollable_frame, monthly_change, row=grid_row, column=9)
+                self.create_change_label(self.scrollable_frame, quarterly_change, row=grid_row, column=10)
+                self.create_change_label(self.scrollable_frame, yearly_change, row=grid_row, column=11)
+                self.create_change_label(self.scrollable_frame, ytd_change, row=grid_row, column=12)
                 
             except Exception as e:
                 print(f"Erro ao adicionar ação {i} ({ticker if 'ticker' in locals() else 'desconhecida'}): {e}")
@@ -893,7 +656,7 @@ class BrazilStocksDashboard:
         
         # Se ainda há mais dados para mostrar, agendar o próximo lote
         if end_idx < len(data):
-            self.master.after(10, lambda: self._populate_table_batch(data, end_idx, batch_size))
+            self.master.after(10, lambda: self._populate_table_batch(data, end_idx, batch_size, offset))
         else:
             # Terminou, adicionar bindings
             self.add_selection_bindings()
@@ -914,7 +677,7 @@ class BrazilStocksDashboard:
             return 0.0
 
     def add_selection_bindings(self):
-        """Adiciona eventos de clique para seleção de ações na tabela - versão melhorada"""
+        """Adiciona eventos de clique para seleção de ações na tabela - versão simplificada"""
         # Verificar quantas linhas existem no frame scrollable
         total_rows = self.scrollable_frame.grid_size()[1]
         
@@ -926,14 +689,21 @@ class BrazilStocksDashboard:
             widgets = self.scrollable_frame.grid_slaves(row=row, column=0)
             if widgets:
                 widget = widgets[0]
-                # Remover bindings anteriores se existirem
+                # Remover bindings anteriores
                 widget.unbind("<Button-1>")
                 widget.unbind("<Double-Button-1>")
+                widget.unbind("<Return>")
                 
                 # Adicionar novos bindings
                 widget.bind("<Button-1>", lambda e, r=row: self._handle_single_click(r))
                 widget.bind("<Double-Button-1>", lambda e, r=row: self._handle_double_click(r))
+                # Adicionar binding para Enter para facilitar o uso com teclado
+                widget.bind("<Return>", lambda e, r=row: self._handle_double_click(r))
+                
                 self.click_bindings.append((widget, row))
+        
+        # Adicionar binding global para Enter
+        self.master.bind("<Return>", lambda e: self.show_selected_stock_graph())
 
     def _handle_single_click(self, row):
         """Função dedicada para tratar cliques simples"""
@@ -1463,10 +1233,90 @@ class BrazilStocksDashboard:
 
     # Adicione este método que está faltando para configurar os cabeçalhos da tabela
     def _setup_table_headers(self):
-        """Configura os cabeçalhos da tabela de ações"""
-        # Configura cabeçalhos da tabela com os campos necessários
-        headers = ["Ação", "Preço", "Abertura", "Mínima", "Máxima", "Fechamento", "Vol. Financeiro", "Vol. Negócios", "Var %", "Var 1M %", "Var 3M %", "Var 12M %", "Var YTD %"]
+        """Configura os cabeçalhos da tabela de ações com informações do período"""
+        headers = [
+            "Ação", "Preço", "Abertura", "Mínima", "Máxima", "Fechamento", 
+            "Vol. Financeiro", "Vol. Negócios", "Diário %", "Mensal %", 
+            "Trimestral %", "Anual %", "YTD %"
+        ]
+        
         for col, header in enumerate(headers):
-            ttk.Label(self.scrollable_frame, text=header, font=("Arial", 10, "bold")).grid(
-                row=0, column=col, padx=10, pady=5, sticky="w"
+            header_label = ttk.Label(
+                self.scrollable_frame, 
+                text=header, 
+                font=("Arial", 10, "bold")
             )
+            header_label.grid(row=0, column=col, padx=10, pady=5)
+            
+            # Adicionar tooltips explicativos para ajudar o usuário
+            if header == "Diário %":
+                self.add_tooltip(header_label, "Variação percentual no último dia útil")
+            elif header == "Mensal %":
+                self.add_tooltip(header_label, "Variação percentual no último mês")
+            elif header == "Trimestral %":
+                self.add_tooltip(header_label, "Variação percentual nos últimos 3 meses")
+            elif header == "Anual %":
+                self.add_tooltip(header_label, "Variação percentual nos últimos 12 meses")
+            elif header == "YTD %":
+                self.add_tooltip(header_label, "Variação percentual desde o início do ano")
+
+    def show_selected_stock_graph(self):
+        """Mostra o gráfico da ação atualmente selecionada"""
+        if hasattr(self, 'last_selected_row'):
+            try:
+                ticker_widget = self.scrollable_frame.grid_slaves(row=self.last_selected_row, column=0)
+                if ticker_widget:
+                    ticker = ticker_widget[0].cget('text')
+                    
+                    # Mostrar carregando
+                    for widget in self.chart_display.winfo_children():
+                        widget.destroy()
+                        
+                    loading_label = ttk.Label(
+                        self.chart_display,
+                        text=f"Carregando dados de {ticker}...",
+                        font=("Arial", 14, "bold")
+                    )
+                    loading_label.pack(pady=50)
+                    self.chart_display.update()
+                    
+                    # Carregar o gráfico
+                    self.master.after(10, lambda: self.process_stock_chart(ticker))
+                    return
+            except Exception as e:
+                print(f"Erro ao mostrar gráfico da ação selecionada: {e}")
+        
+        # Se não houver seleção, mostrar mensagem
+        messagebox.showinfo("Nenhuma Seleção", "Selecione uma ação primeiro clicando nela na tabela.")
+
+    def add_tooltip(self, widget, text):
+        """Adiciona tooltip a um widget"""
+        def enter(event):
+            # Criar janela popup
+            x, y, _, _ = widget.bbox("insert")
+            x += widget.winfo_rootx() + 25
+            y += widget.winfo_rooty() + 20
+            
+            # Remover popup existente
+            self.hide_tooltip()
+            
+            # Criar novo popup
+            self.popup = tk.Toplevel(widget)
+            self.popup.wm_overrideredirect(True)
+            self.popup.wm_geometry(f"+{x}+{y}")
+            
+            label = ttk.Label(self.popup, text=text, background="#ffffe0", 
+                             relief="solid", borderwidth=1, font=("Arial", 9))
+            label.pack(ipadx=5, ipady=2)
+        
+        def leave(event):
+            self.hide_tooltip()
+        
+        widget.bind("<Enter>", enter)
+        widget.bind("<Leave>", leave)
+
+    def hide_tooltip(self):
+        """Esconde o tooltip atual se existir"""
+        if hasattr(self, 'popup') and self.popup:
+            self.popup.destroy()
+            self.popup = None
