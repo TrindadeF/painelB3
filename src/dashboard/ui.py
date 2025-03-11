@@ -15,9 +15,9 @@ class BrazilStocksDashboard:
         self.master.title("Dashboard de Ações Brasileiras - B3")
         self.master.geometry("1280x800")
         
-        # Remover self.filter_text que não será mais usado
-        self.sort_column = ""        # Coluna atual de ordenação
-        self.sort_ascending = True   # Direção da ordenação
+        # Inicializar variáveis de ordenação
+        self.sort_column = "code"    # Inicialmente ordenar por código da ação
+        self.sort_ascending = True   # Ordem crescente por padrão
         
         # Criar um estilo personalizado para os cabeçalhos das colunas
         style = ttk.Style()
@@ -26,30 +26,20 @@ class BrazilStocksDashboard:
         self.create_widgets()
         
     def create_widgets(self):
-        """Cria todos os widgets do dashboard - versão simplificada sem comparação"""
-        # Frame principal com divisão em painéis
-        main_paned = ttk.PanedWindow(self.master, orient=tk.HORIZONTAL)
-        main_paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Painel esquerdo para tabela de ações
-        left_frame = ttk.Frame(main_paned, width=600)
-        main_paned.add(left_frame, weight=1)
-        
-        # Painel direito para gráficos
-        right_frame = ttk.Frame(main_paned, width=400)
-        main_paned.add(right_frame, weight=1)
+        """Cria todos os widgets do dashboard - versão simplificada sem painel de gráficos"""
+        # Frame principal 
+        main_frame = ttk.Frame(self.master)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # Frame para filtros e controles
-        controls_frame = ttk.LabelFrame(left_frame, text="Filtros e Controles")
+        controls_frame = ttk.LabelFrame(main_frame, text="Filtros e Controles")
         controls_frame.pack(fill=tk.X, padx=5, pady=5)
         
         # Título principal
         ttk.Label(controls_frame, text="Dashboard de Ações da B3", 
                  font=("Arial", 14, "bold")).pack(pady=10)
         
-        # REMOVER TODO O CÓDIGO DE FILTRO DE TEXTO ANTIGO
-        
-        # Adicionar o novo filtro de setor
+        # Adicionar o filtro de setor
         self.setup_sector_filter(controls_frame)
         
         # Adicionar botão de limpar cache
@@ -69,48 +59,12 @@ class BrazilStocksDashboard:
         limit_check.pack(side=tk.LEFT, padx=5)
         
         # Frame para tabela de ações
-        self.stocks_frame = ttk.LabelFrame(left_frame, text="Ações")
+        self.stocks_frame = ttk.LabelFrame(main_frame, text="Ações")
         self.stocks_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Usar a versão com rolagem em vez de paginação
+        # Setup da tabela de ações com rolagem
         self.setup_scrollable_stock_table()
-        
-        # Frame para gráficos
-        self.charts_frame = ttk.LabelFrame(right_frame, text="Gráficos de Rentabilidade")
-        self.charts_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Inicializar área de gráficos
-        self.create_charts_area(self.charts_frame)
-    
 
-    def create_charts_area(self, parent):
-        """Cria área simples para exibição de gráficos - versão sem comparação"""
-        # Texto de instruções
-        ttk.Label(parent, 
-                 text="Clique em uma ação para ver sua rentabilidade",
-                 font=("Arial", 12)).pack(pady=10)
-        
-        # Frame para exibir gráficos
-        self.chart_display = ttk.Frame(parent)
-        self.chart_display.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Mensagem inicial
-        ttk.Label(self.chart_display, 
-                 text="Selecione uma ação na tabela para ver o gráfico de rentabilidade",
-                 font=("Arial", 12)).pack(pady=50)
-        
-        # Adicionar um botão alternativo para exibir gráfico (além do duplo clique)
-        view_button_frame = ttk.Frame(parent)
-        view_button_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        ttk.Button(view_button_frame, 
-                  text="Exibir Gráfico da Ação Selecionada",
-                  command=self.show_selected_stock_graph).pack(side=tk.LEFT, padx=5)
-        
-        # Adicionar informação sobre atalhos
-        ttk.Label(view_button_frame, 
-                 text="Atalho: Enter = Exibir Gráfico",
-                 font=("Arial", 8)).pack(side=tk.RIGHT, padx=10)
 
         
     def get_filtered_data(self):
@@ -273,45 +227,68 @@ class BrazilStocksDashboard:
     
 
     def setup_sector_filter(self, parent_frame):
-        """Configura o filtro de setores - versão corrigida e simplificada"""
+        """Configura o filtro de setores e seletor de período para barras visuais"""
         # Criar frame para alinhamento
         filter_controls = ttk.Frame(parent_frame)
         filter_controls.pack(fill=tk.X, padx=5, pady=5)
         
-        # Label para setor
+        # Label e combobox para setor
         ttk.Label(filter_controls, text="Setor:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=(0, 5))
         
-        # Obter valores únicos de setores e garantir formatação consistente
+        # Obter valores únicos de setores
         sectors = []
-        
         if 'sector' in self.performance_data.columns:
-            # Normalizar valores e remover duplicatas
             sector_values = self.performance_data['sector'].dropna().unique()
             sector_values = [str(s).strip() for s in sector_values if str(s).strip()]
-            sectors = ['Todos'] + sorted(set(sector_values))  # Usando set para garantir valores únicos
-            print(f"Setores disponíveis: {sectors}")
+            sectors = ['Todos'] + sorted(set(sector_values))
         else:
             sectors = ['Todos']
-            print("Aviso: Coluna 'sector' não encontrada nos dados")
         
-        # Criar combobox de setores
+        # Combobox de setores
         self.sector_var = tk.StringVar(value='Todos')
         self.sector_combobox = ttk.Combobox(
             filter_controls,
             textvariable=self.sector_var,
             values=sectors,
-            width=30,
+            width=20,
             state="readonly"
         )
         self.sector_combobox.pack(side=tk.LEFT, padx=5)
         
-        # Botões de filtro - Usar apenas o botão de mostrar todas
+        # Botão de mostrar todas
         ttk.Button(filter_controls, 
                   text="Mostrar Todas as Ações", 
                   command=self.show_all_stocks).pack(side=tk.LEFT, padx=5)
         
-        # IMPORTANTE: O binding correto
+        # NOVO: Seletor de período para barras de rentabilidade
+        ttk.Label(filter_controls, text="Visualizar barras:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=(20, 5))
+        
+        # Coleção de períodos disponíveis
+        self.period_column_map = {
+            'Diário': 'daily_return',
+            'Mensal': 'monthly_return',
+            'Trimestral': 'quarterly_return', 
+            'Anual': 'yearly_return',
+            'YTD': 'ytd_return'
+        }
+        
+        # Combobox para seleção de período
+        self.visual_period_var = tk.StringVar(value='Mensal')
+        self.period_combobox = ttk.Combobox(
+            filter_controls,
+            textvariable=self.visual_period_var,
+            values=list(self.period_column_map.keys()),
+            width=12,
+            state="readonly"
+        )
+        self.period_combobox.pack(side=tk.LEFT, padx=5)
+        
+        # Bindings para eventos
         self.sector_combobox.bind("<<ComboboxSelected>>", self._on_sector_selected)
+        self.period_combobox.bind("<<ComboboxSelected>>", self._on_period_selected)
+        
+        # Inicializar com período mensal
+        self.selected_metric = 'monthly_return'
 
     def _on_sector_selected(self, event=None):
         """Função específica para tratar seleção de setor - versão corrigida"""
@@ -375,11 +352,21 @@ class BrazilStocksDashboard:
         ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
         
         # Preencher tabela com dados filtrados
-        sorted_data = filtered_data.sort_values(by='code')
+        if hasattr(self, 'sort_column') and self.sort_column in filtered_data.columns:
+            sorted_data = filtered_data.sort_values(
+                by=self.sort_column,
+                ascending=self.sort_ascending,
+                na_position='last'
+            )
+        else:
+            sorted_data = filtered_data.sort_values(by='code')
         self._populate_table_batch(sorted_data, 1, 100, offset=1)
 
+        # Atualizar cabeçalhos para refletir ordenação atual
+        self._setup_table_headers()
+
     def filter_by_specific_sector(self, selected_sector):
-        """Filtra os dados pelo setor específico sem depender de self.sector_var"""
+        """Filtra os dados pelo setor específico preservando ordenação"""
         data = self.performance_data.copy()
         
         # Verificar se há dados
@@ -423,6 +410,14 @@ class BrazilStocksDashboard:
         
         # Resultado final
         print(f"Filtro específico aplicado: {len(filtered_data)} ações encontradas para setor '{selected_sector}'")
+        
+        # Preservar ordenação atual se definida
+        if hasattr(self, 'sort_column') and self.sort_column in filtered_data.columns:
+            filtered_data = filtered_data.sort_values(
+                by=self.sort_column,
+                ascending=self.sort_ascending,
+                na_position='last'
+            )
         
         return filtered_data
 
@@ -581,9 +576,12 @@ class BrazilStocksDashboard:
         self._populate_table_batch(sorted_data, 0, 50)
 
     def _populate_table_batch(self, data, start_idx, batch_size, offset=0):
-        """Versão corrigida que preenche a tabela em lotes com suporte a deslocamento (offset)"""
+        """Versão que inclui barras de rentabilidade horizontal"""
         end_idx = min(start_idx + batch_size, len(data))
         batch = data.iloc[start_idx:end_idx]
+        
+        # Determinar qual coluna de rentabilidade está selecionada para visualização
+        selected_return_col = self.selected_metric if hasattr(self, 'selected_metric') else 'monthly_return'
         
         for i, (_, row) in enumerate(batch.iterrows(), start_idx + 1):
             # Calcular a linha real na grid considerando o offset
@@ -592,9 +590,6 @@ class BrazilStocksDashboard:
             try:
                 # Obter dados básicos
                 ticker = str(row['code']) if 'code' in row else "N/A"
-                
-                # Mostrar o setor para diagnóstico
-                sector_value = row['sector'] if 'sector' in row else "N/A"
                 
                 # Obter valores com segurança
                 price = self.safe_get_value(row, 'current_price')
@@ -613,34 +608,39 @@ class BrazilStocksDashboard:
                 yearly_change = self.safe_get_value(row, 'yearly_return')
                 ytd_change = self.safe_get_value(row, 'ytd_return')
                 
+                # Obter o valor para a barra visual
+                visual_value = self.safe_get_value(row, selected_return_col)
+                
+                # Obter o setor para tooltip
+                sector_value = row['sector'] if 'sector' in row else "N/A"
+                
                 # Adicionar cada célula à tabela
                 ticker_label = ttk.Label(self.scrollable_frame, text=ticker)
-                ticker_label.grid(row=grid_row, column=0, padx=10, pady=2, sticky="w")
+                ticker_label.grid(row=grid_row, column=0, padx=5, pady=2, sticky="w")
                 
                 # Adicionar tooltip com setor
                 self.add_tooltip(ticker_label, f"Setor: {sector_value}")
                 
-                ttk.Label(self.scrollable_frame, text=f"R$ {price:.2f}").grid(
-                    row=grid_row, column=1, padx=10, pady=2, sticky="e")
-                
                 # Adicionar demais campos
+                ttk.Label(self.scrollable_frame, text=f"R$ {price:.2f}").grid(
+                    row=grid_row, column=1, padx=5, pady=2, sticky="e")
                 ttk.Label(self.scrollable_frame, text=f"R$ {open_price:.2f}").grid(
-                    row=grid_row, column=2, padx=10, pady=2, sticky="e")
+                    row=grid_row, column=2, padx=5, pady=2, sticky="e")
                 ttk.Label(self.scrollable_frame, text=f"R$ {low_price:.2f}").grid(
-                    row=grid_row, column=3, padx=10, pady=2, sticky="e")
+                    row=grid_row, column=3, padx=5, pady=2, sticky="e")
                 ttk.Label(self.scrollable_frame, text=f"R$ {high_price:.2f}").grid(
-                    row=grid_row, column=4, padx=10, pady=2, sticky="e")
+                    row=grid_row, column=4, padx=5, pady=2, sticky="e")
                 ttk.Label(self.scrollable_frame, text=f"R$ {close_price:.2f}").grid(
-                    row=grid_row, column=5, padx=10, pady=2, sticky="e")
+                    row=grid_row, column=5, padx=5, pady=2, sticky="e")
                 
                 # Formatação para volumes
                 vol_text = f"R$ {financial_volume/1_000_000:.2f}M" if financial_volume >= 1_000_000 else \
                          f"R$ {financial_volume/1_000:.2f}K" if financial_volume > 0 else "R$ 0.00"
                 
                 ttk.Label(self.scrollable_frame, text=vol_text).grid(
-                    row=grid_row, column=6, padx=10, pady=2, sticky="e")
+                    row=grid_row, column=6, padx=5, pady=2, sticky="e")
                 ttk.Label(self.scrollable_frame, text=f"{trades_volume:,.0f}").grid(
-                    row=grid_row, column=7, padx=10, pady=2, sticky="e")
+                    row=grid_row, column=7, padx=5, pady=2, sticky="e")
                 
                 # Formatar as variações com cores
                 self.create_change_label(self.scrollable_frame, daily_change, row=grid_row, column=8)
@@ -648,6 +648,12 @@ class BrazilStocksDashboard:
                 self.create_change_label(self.scrollable_frame, quarterly_change, row=grid_row, column=10)
                 self.create_change_label(self.scrollable_frame, yearly_change, row=grid_row, column=11)
                 self.create_change_label(self.scrollable_frame, ytd_change, row=grid_row, column=12)
+                
+                # NOVO: Adicionar barra visual de rentabilidade
+                self.create_performance_bar(
+                    self.scrollable_frame, visual_value, 
+                    max_value=30, row=grid_row, column=13
+                )
                 
             except Exception as e:
                 print(f"Erro ao adicionar ação {i} ({ticker if 'ticker' in locals() else 'desconhecida'}): {e}")
@@ -712,75 +718,15 @@ class BrazilStocksDashboard:
         self.last_selected_row = row
 
     def _handle_double_click(self, row):
-        """Função dedicada para tratar duplos cliques de forma mais confiável"""
-        # Imediatamente mostrar o indicador de carregamento
-        ticker_widget = self.scrollable_frame.grid_slaves(row=row, column=0)
-        if not ticker_widget:
-            print(f"Widget não encontrado na linha {row}")
-            return
-            
-        ticker = ticker_widget[0].cget('text')
-        print(f"Duplo clique na ação {ticker} (linha {row})")
-        
+        """Função simplificada de duplo clique - apenas destaca a linha"""
         # Destacar a linha
         self.select_stock_row(row)
         
-        # Limpar área de gráficos e mostrar carregando
-        for widget in self.chart_display.winfo_children():
-            widget.destroy()
-            
-        loading_label = ttk.Label(
-            self.chart_display, 
-            text=f"Carregando dados de {ticker}...",
-            font=("Arial", 14, "bold")
-        )
-        loading_label.pack(pady=50)
-        self.chart_display.update()  # Forçar atualização imediata
-        
-        # Usar after com prioridade alta (10ms) para garantir execução rápida
-        self.master.after(10, lambda: self.process_stock_chart(ticker))
-
-    def process_stock_chart(self, ticker):
-        """Função separada para processar o gráfico após duplo clique"""
-        try:
-            # Verificar se a ação existe
-            ticker_exists = False
-            for _, row in self.performance_data.iterrows():
-                if row['code'] == ticker:
-                    ticker_exists = True
-                    break
-                    
-            if not ticker_exists:
-                for widget in self.chart_display.winfo_children():
-                    widget.destroy()
-                    
-                ttk.Label(
-                    self.chart_display,
-                    text=f"Ação {ticker} não encontrada nos dados",
-                    font=("Arial", 14, "bold")
-                ).pack(pady=20)
-                return
-                
-            # Se existe, mostrar o gráfico
-            self.show_stock_performance(ticker)
-            
-        except Exception as e:
-            for widget in self.chart_display.winfo_children():
-                widget.destroy()
-                
-            ttk.Label(
-                self.chart_display,
-                text=f"Erro ao processar {ticker}",
-                font=("Arial", 14, "bold")
-            ).pack(pady=20)
-            
-            ttk.Label(
-                self.chart_display,
-                text=str(e),
-                foreground="red"
-            ).pack(pady=10)
-            
-            print(f"Erro ao processar ação {ticker}: {e}")
+        # Obter ticker para feedback
+        ticker_widget = self.scrollable_frame.grid_slaves(row=row, column=0)
+        if ticker_widget:
+            ticker = ticker_widget[0].cget('text')
+            print(f"Linha selecionada: {ticker}")
 
     def select_stock_row(self, row):
         """Destaca a linha selecionada"""
@@ -840,352 +786,6 @@ class BrazilStocksDashboard:
         # Usar after para permitir que a interface atualize antes de processar
         self.master.after(100, lambda: self.show_stock_performance_with_error_handling(ticker, loading_label))
 
-    def show_stock_performance_with_error_handling(self, ticker, loading_label):
-        """Wrapper para show_stock_performance com melhor tratamento de erros"""
-        try:
-            # Verificar se o ticker realmente existe no dataset
-            if ticker not in self.performance_data['code'].values:
-                loading_label.destroy()
-                ttk.Label(self.chart_display, 
-                         text=f"Ação {ticker} não encontrada no conjunto de dados",
-                         font=("Arial", 14, "bold")).pack(pady=20)
-                ttk.Label(self.chart_display, 
-                         text="Verifique se os dados foram carregados corretamente.",
-                         font=("Arial", 11)).pack(pady=10)
-                return
-                
-            # Remover label de carregamento e mostrar gráfico
-            for widget in self.chart_display.winfo_children():
-                widget.destroy()
-                
-            self.show_stock_performance(ticker)
-        except Exception as e:
-            # Tratamento de erros aprimorado
-            for widget in self.chart_display.winfo_children():
-                widget.destroy()
-                
-            ttk.Label(self.chart_display, 
-                     text=f"Erro ao processar dados da ação {ticker}",
-                     font=("Arial", 14, "bold")).pack(pady=20)
-                     
-            ttk.Label(self.chart_display, 
-                     text=f"Detalhes do erro: {str(e)}",
-                     foreground="red").pack(pady=10)
-                     
-            print(f"Erro ao processar {ticker}: {str(e)}")
-
-    def show_stock_performance(self, ticker):
-        """Mostra o gráfico de rentabilidade de uma ação com datas reais de negociação"""
-        # Limpar área de gráficos
-        for widget in self.chart_display.winfo_children():
-            widget.destroy()
-        
-        # Mostrar mensagem de carregamento
-        loading_label = ttk.Label(self.chart_display, 
-                                 text=f"Carregando dados de {ticker}...",
-                                 font=("Arial", 14, "bold"))
-        loading_label.pack(pady=50)
-        self.chart_display.update_idletasks()
-        
-        try:
-            # Obter dados da ação
-            stock_data = self.performance_data[self.performance_data['code'] == ticker]
-            
-            if stock_data.empty:
-                loading_label.destroy()
-                ttk.Label(self.chart_display, 
-                         text=f"Não foram encontrados dados para {ticker}",
-                         font=("Arial", 12)).pack(pady=50)
-                return
-            
-            # Importações necessárias
-            from datetime import datetime, timedelta
-            import pandas_market_calendars as mcal
-            
-            # Obter calendário da B3
-            b3 = mcal.get_calendar('B3')
-            
-            # Data atual
-            current_date = datetime.now()
-            
-            # Encontrar a última data de negociação (dia útil)
-            # Verificar os últimos 10 dias até encontrar um dia útil
-            last_trading_day = None
-            for days_back in range(10):
-                check_date = current_date - timedelta(days=days_back)
-                schedule = b3.schedule(start_date=check_date.strftime('%Y-%m-%d'), 
-                                      end_date=check_date.strftime('%Y-%m-%d'))
-                if not schedule.empty:
-                    last_trading_day = check_date
-                    break
-            
-            if last_trading_day is None:
-                last_trading_day = current_date  # Fallback se não encontrar
-            
-            # Obter datas de negociação para diferentes períodos
-            today_str = last_trading_day.strftime('%Y-%m-%d')
-            
-            # Cálculo para 1 dia útil atrás
-            daily_start = b3.schedule(end_date=today_str, start_date=(last_trading_day - timedelta(days=10)).strftime('%Y-%m-%d'))
-            daily_date = datetime.strptime(str(daily_start.index[-2].date()), '%Y-%m-%d') if len(daily_start) >= 2 else last_trading_day - timedelta(days=1)
-            
-            # Cálculo para 1 semana útil atrás (aproximadamente 5 dias úteis)
-            weekly_start = b3.schedule(end_date=today_str, start_date=(last_trading_day - timedelta(days=30)).strftime('%Y-%m-%d'))
-            weekly_date = datetime.strptime(str(weekly_start.index[-6].date()), '%Y-%m-%d') if len(weekly_start) >= 6 else last_trading_day - timedelta(days=7)
-            
-            # Cálculo para 1 mês útil atrás (aproximadamente 22 dias úteis)
-            monthly_start = b3.schedule(end_date=today_str, start_date=(last_trading_day - timedelta(days=60)).strftime('%Y-%m-%d'))
-            monthly_date = datetime.strptime(str(monthly_start.index[-22].date()), '%Y-%m-%d') if len(monthly_start) >= 22 else last_trading_day - timedelta(days=30)
-            
-            # Cálculo para 3 meses úteis atrás (aproximadamente 66 dias úteis)
-            quarterly_start = b3.schedule(end_date=today_str, start_date=(last_trading_day - timedelta(days=180)).strftime('%Y-%m-%d'))
-            quarterly_date = datetime.strptime(str(quarterly_start.index[-66].date()), '%Y-%m-%d') if len(quarterly_start) >= 66 else last_trading_day - timedelta(days=90)
-            
-            # Cálculo para 1 ano útil atrás (aproximadamente 252 dias úteis)
-            yearly_start = b3.schedule(end_date=today_str, start_date=(last_trading_day - timedelta(days=500)).strftime('%Y-%m-%d'))
-            yearly_date = datetime.strptime(str(yearly_start.index[-252].date()), '%Y-%m-%d') if len(yearly_start) >= 252 else last_trading_day - timedelta(days=365)
-            
-            # Cálculo para início do ano atual
-            ytd_date = datetime(last_trading_day.year, 1, 1)
-            
-            # Definir períodos com datas reais de negociação
-            periods = {
-                'daily_return': {
-                    'label': 'Diária',
-                    'start_date': daily_date.strftime('%d/%m/%Y'),
-                    'end_date': last_trading_day.strftime('%d/%m/%Y')
-                },
-                'weekly_return': {
-                    'label': 'Semanal',
-                    'start_date': weekly_date.strftime('%d/%m/%Y'),
-                    'end_date': last_trading_day.strftime('%d/%m/%Y')
-                },
-                'monthly_return': {
-                    'label': 'Mensal',
-                    'start_date': monthly_date.strftime('%d/%m/%Y'),
-                    'end_date': last_trading_day.strftime('%d/%m/%Y')
-                },
-                'quarterly_return': {
-                    'label': 'Trimestral',
-                    'start_date': quarterly_date.strftime('%d/%m/%Y'),
-                    'end_date': last_trading_day.strftime('%d/%m/%Y')
-                },
-                'yearly_return': {
-                    'label': 'Anual',
-                    'start_date': yearly_date.strftime('%d/%m/%Y'),
-                    'end_date': last_trading_day.strftime('%d/%m/%Y')
-                },
-                'ytd_return': {
-                    'label': 'YTD',
-                    'start_date': ytd_date.strftime('%d/%m/%Y'),
-                    'end_date': last_trading_day.strftime('%d/%m/%Y')
-                }
-            }
-            
-            # Remover mensagem de carregamento
-            loading_label.destroy()
-            
-            # O resto do código para exibir o gráfico permanece o mesmo...
-            # Apenas mudamos como as datas são calculadas acima
-            
-            # Mostrar título
-            ttk.Label(self.chart_display, 
-                     text=f"Rentabilidade da Ação: {ticker} (Dias Úteis)",
-                     font=("Arial", 14, "bold")).pack(pady=10)
-            
-            # Criar figura para o gráfico
-            fig = plt.Figure(figsize=(10, 6), dpi=100)
-            ax = fig.add_subplot(111)
-            
-            # Resto do código continua...
-            # [O restante da função permanece essencialmente o mesmo]
-            
-            # Filtrar apenas colunas disponíveis nos dados
-            available_returns = [(col, periods[col]['label'], periods[col]) 
-                                for col in periods.keys() 
-                                if col in stock_data.columns]
-            
-            # Extrair valores...
-            # ...
-            
-            if not available_returns:
-                ttk.Label(self.chart_display, 
-                         text=f"Não foram encontrados dados de rentabilidade para {ticker}",
-                         font=("Arial", 12)).pack(pady=50)
-                return
-            
-            # Extrair valores e labels com datas
-            values = []
-            labels = []
-            colors = []
-            date_ranges = []
-            
-            for col, label, period in available_returns:
-                try:
-                    # Corrigir o uso de float em Series
-                    value = stock_data[col].iloc[0]
-                    if isinstance(value, pd.Series):
-                        value = value.iloc[0]
-                    value = float(value)
-                    
-                    values.append(value)
-                    
-                    # Label com período e datas
-                    period_label = f"{label}\n({period['start_date']} a\n{period['end_date']})"
-                    labels.append(period_label)
-                    
-                    date_ranges.append(f"{period['start_date']} a {period['end_date']}")
-                    colors.append('green' if value > 0 else 'red')
-                except (ValueError, IndexError, KeyError) as e:
-                    print(f"Erro ao processar {col} para {ticker}: {e}")
-            
-            # Criar gráfico de barras
-            bars = ax.bar(labels, values, color=colors, alpha=0.7)
-            
-            # Adicionar valores no topo das barras
-            for i, bar in enumerate(bars):
-                height = bar.get_height()
-                if height >= 0:
-                    y_pos = height + 0.3
-                    va = 'bottom'
-                else:
-                    y_pos = height - 0.3
-                    va = 'top'
-                
-                ax.text(bar.get_x() + bar.get_width()/2., y_pos,
-                       f'{values[i]:.2f}%', ha='center', va=va, fontsize=9, fontweight='bold')
-            
-            # Configurar eixos e títulos
-            ax.set_title(f"Rentabilidade de {ticker} por Período", fontsize=14)
-            ax.set_ylabel('Rentabilidade (%)', fontsize=12)
-            
-            # Ajustar tamanho e rotação das labels do eixo x
-            plt.setp(ax.get_xticklabels(), fontsize=8, rotation=0)
-            
-            # Adicionar grid para facilitar a leitura
-            ax.grid(True, axis='y', linestyle='--', alpha=0.7)
-            
-            # Linha de zero para referência
-            ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
-            
-            # Ajustar layout
-            fig.tight_layout()
-            
-            # Colocar gráfico no frame
-            canvas = FigureCanvasTkAgg(fig, master=self.chart_display)
-            canvas.draw()
-            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-            
-            # Adicionar legenda explicativa para os períodos
-            legend_frame = ttk.LabelFrame(self.chart_display, text="Períodos de Rentabilidade")
-            legend_frame.pack(fill=tk.X, padx=5, pady=5)
-            
-            # Criar grid para a legenda
-            ttk.Label(legend_frame, text="Diária:", font=("Arial", 9, "bold")).grid(
-                row=0, column=0, padx=10, pady=2, sticky="w")
-            ttk.Label(legend_frame, text=f"{periods['daily_return']['start_date']} a {periods['daily_return']['end_date']}").grid(
-                row=0, column=1, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(legend_frame, text="Semanal:", font=("Arial", 9, "bold")).grid(
-                row=0, column=2, padx=10, pady=2, sticky="w")
-            ttk.Label(legend_frame, text=f"{periods['weekly_return']['start_date']} a {periods['weekly_return']['end_date']}").grid(
-                row=0, column=3, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(legend_frame, text="Mensal:", font=("Arial", 9, "bold")).grid(
-                row=1, column=0, padx=10, pady=2, sticky="w")
-            ttk.Label(legend_frame, text=f"{periods['monthly_return']['start_date']} a {periods['monthly_return']['end_date']}").grid(
-                row=1, column=1, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(legend_frame, text="Trimestral:", font=("Arial", 9, "bold")).grid(
-                row=1, column=2, padx=10, pady=2, sticky="w")
-            ttk.Label(legend_frame, text=f"{periods['quarterly_return']['start_date']} a {periods['quarterly_return']['end_date']}").grid(
-                row=1, column=3, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(legend_frame, text="Anual:", font=("Arial", 9, "bold")).grid(
-                row=2, column=0, padx=10, pady=2, sticky="w")
-            ttk.Label(legend_frame, text=f"{periods['yearly_return']['start_date']} a {periods['yearly_return']['end_date']}").grid(
-                row=2, column=1, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(legend_frame, text="YTD:", font=("Arial", 9, "bold")).grid(
-                row=2, column=2, padx=10, pady=2, sticky="w")
-            ttk.Label(legend_frame, text=f"{periods['ytd_return']['start_date']} a {periods['ytd_return']['end_date']}").grid(
-                row=2, column=3, padx=10, pady=2, sticky="w")
-            
-            # Adicionar informações adicionais da ação
-            info_frame = ttk.LabelFrame(self.chart_display, text="Informações da Ação")
-            info_frame.pack(fill=tk.X, padx=5, pady=5)
-            
-            # Obter dados da ação para exibição
-            price = self.safe_get_value(stock_data.iloc[0], 'current_price')
-            open_price = self.safe_get_value(stock_data.iloc[0], 'open_price')
-            high_price = self.safe_get_value(stock_data.iloc[0], 'high_price')
-            low_price = self.safe_get_value(stock_data.iloc[0], 'low_price')
-            close_price = self.safe_get_value(stock_data.iloc[0], 'close_price')
-            volume = self.safe_get_value(stock_data.iloc[0], 'volume')
-            
-            # Dados do setor
-            sector = stock_data['sector'].iloc[0] if 'sector' in stock_data.columns else "N/A"
-            data_ref = last_trading_day.strftime('%d/%m/%Y')
-            
-            # Grid para informações com data de referência
-            ttk.Label(info_frame, text="Data de Referência:", font=("Arial", 9, "bold")).grid(
-                row=0, column=0, padx=10, pady=2, sticky="w")
-            ttk.Label(info_frame, text=data_ref).grid(
-                row=0, column=1, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(info_frame, text="Preço Atual:", font=("Arial", 9, "bold")).grid(
-                row=0, column=2, padx=10, pady=2, sticky="w")
-            ttk.Label(info_frame, text=f"R$ {price:.2f}").grid(
-                row=0, column=3, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(info_frame, text=f"Abertura ({data_ref}):", font=("Arial", 9, "bold")).grid(
-                row=1, column=0, padx=10, pady=2, sticky="w")
-            ttk.Label(info_frame, text=f"R$ {open_price:.2f}").grid(
-                row=1, column=1, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(info_frame, text=f"Máxima ({data_ref}):", font=("Arial", 9, "bold")).grid(
-                row=1, column=2, padx=10, pady=2, sticky="w")
-            ttk.Label(info_frame, text=f"R$ {high_price:.2f}").grid(
-                row=1, column=3, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(info_frame, text=f"Mínima ({data_ref}):", font=("Arial", 9, "bold")).grid(
-                row=2, column=0, padx=10, pady=2, sticky="w")
-            ttk.Label(info_frame, text=f"R$ {low_price:.2f}").grid(
-                row=2, column=1, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(info_frame, text=f"Fechamento ({data_ref}):", font=("Arial", 9, "bold")).grid(
-                row=2, column=2, padx=10, pady=2, sticky="w")
-            ttk.Label(info_frame, text=f"R$ {close_price:.2f}").grid(
-                row=2, column=3, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(info_frame, text="Volume:", font=("Arial", 9, "bold")).grid(
-                row=3, column=0, padx=10, pady=2, sticky="w")
-            if volume >= 1_000_000:
-                vol_text = f"R$ {volume/1_000_000:.2f}M"
-            else:
-                vol_text = f"R$ {volume/1_000:.2f}K" if volume > 0 else "R$ 0.00"
-            ttk.Label(info_frame, text=vol_text).grid(
-                row=3, column=1, padx=10, pady=2, sticky="w")
-            
-            ttk.Label(info_frame, text="Setor:", font=("Arial", 9, "bold")).grid(
-                row=3, column=2, padx=10, pady=2, sticky="w")
-            ttk.Label(info_frame, text=sector).grid(
-                row=3, column=3, padx=10, pady=2, sticky="w")
-            
-        except Exception as e:
-            # Capturar qualquer erro e exibir mensagem amigável
-            print(f"Erro ao gerar gráfico para {ticker}: {str(e)}")
-            
-            for widget in self.chart_display.winfo_children():
-                widget.destroy()
-                
-            ttk.Label(self.chart_display, 
-                     text=f"Não foi possível exibir o gráfico para {ticker}",
-                     font=("Arial", 12, "bold")).pack(pady=20)
-            
-            ttk.Label(self.chart_display, 
-                     text=f"Erro: {str(e)}",
-                     foreground="red").pack(pady=10)
 
     def create_change_label(self, parent, value, row, column):
         """Cria um label formatado para mostrar variação percentual com cores"""
@@ -1231,63 +831,67 @@ class BrazilStocksDashboard:
                               "É necessário recarregar os dados para aplicar esta configuração. Deseja continuar?"):
             self.clear_data_cache()  # Reutiliza método existente para limpar cache e reiniciar
 
-    # Adicione este método que está faltando para configurar os cabeçalhos da tabela
     def _setup_table_headers(self):
-        """Configura os cabeçalhos da tabela de ações com informações do período"""
+        """Configura os cabeçalhos da tabela de ações com ordenação interativa"""
+        # Get the currently selected metric for rentability column
+        selected_metric = self.selected_metric if hasattr(self, 'selected_metric') else 'monthly_return'
+        selected_period = self.visual_period_var.get() if hasattr(self, 'visual_period_var') else "Mensal"
+        
         headers = [
-            "Ação", "Preço", "Abertura", "Mínima", "Máxima", "Fechamento", 
-            "Vol. Financeiro", "Vol. Negócios", "Diário %", "Mensal %", 
-            "Trimestral %", "Anual %", "YTD %"
+            {"name": "Ação", "column": "code", "width": 10},
+            {"name": "Preço", "column": "current_price", "width": 8},
+            {"name": "Abertura", "column": "open_price", "width": 8},
+            {"name": "Mínima", "column": "low_price", "width": 8},
+            {"name": "Máxima", "column": "high_price", "width": 8},
+            {"name": "Fechamento", "column": "close_price", "width": 8},
+            {"name": "Volume", "column": "volume", "width": 10},
+            {"name": "Negócios", "column": "trades", "width": 8},
+            {"name": "Diario %", "column": "daily_return", "width": 6},
+            {"name": "Mensal %", "column": "monthly_return", "width": 6},
+            {"name": "Trimestral %", "column": "quarterly_return", "width": 6},
+            {"name": "Anual %", "column": "yearly_return", "width": 6},
+            {"name": "YTD %", "column": "ytd_return", "width": 6},
+            {"name": f"Rentabilidade {selected_period}", "column": selected_metric, "width": 20},  # Usando o campo real de dados
         ]
         
         for col, header in enumerate(headers):
-            header_label = ttk.Label(
-                self.scrollable_frame, 
-                text=header, 
-                font=("Arial", 10, "bold")
-            )
-            header_label.grid(row=0, column=col, padx=10, pady=5)
+            # Criar um frame para o cabeçalho para poder adicionar indicador de ordenação
+            header_frame = ttk.Frame(self.scrollable_frame)
+            header_frame.grid(row=0, column=col, padx=5, pady=5, sticky="w")
             
-            # Adicionar tooltips explicativos para ajudar o usuário
-            if header == "Diário %":
-                self.add_tooltip(header_label, "Variação percentual no último dia útil")
-            elif header == "Mensal %":
-                self.add_tooltip(header_label, "Variação percentual no último mês")
-            elif header == "Trimestral %":
-                self.add_tooltip(header_label, "Variação percentual nos últimos 3 meses")
-            elif header == "Anual %":
-                self.add_tooltip(header_label, "Variação percentual nos últimos 12 meses")
-            elif header == "YTD %":
-                self.add_tooltip(header_label, "Variação percentual desde o início do ano")
-
-    def show_selected_stock_graph(self):
-        """Mostra o gráfico da ação atualmente selecionada"""
-        if hasattr(self, 'last_selected_row'):
-            try:
-                ticker_widget = self.scrollable_frame.grid_slaves(row=self.last_selected_row, column=0)
-                if ticker_widget:
-                    ticker = ticker_widget[0].cget('text')
-                    
-                    # Mostrar carregando
-                    for widget in self.chart_display.winfo_children():
-                        widget.destroy()
-                        
-                    loading_label = ttk.Label(
-                        self.chart_display,
-                        text=f"Carregando dados de {ticker}...",
-                        font=("Arial", 14, "bold")
-                    )
-                    loading_label.pack(pady=50)
-                    self.chart_display.update()
-                    
-                    # Carregar o gráfico
-                    self.master.after(10, lambda: self.process_stock_chart(ticker))
-                    return
-            except Exception as e:
-                print(f"Erro ao mostrar gráfico da ação selecionada: {e}")
-        
-        # Se não houver seleção, mostrar mensagem
-        messagebox.showinfo("Nenhuma Seleção", "Selecione uma ação primeiro clicando nela na tabela.")
+            # Verificar se esta coluna é a de ordenação atual
+            sort_indicator = ""
+            if hasattr(self, 'sort_column') and self.sort_column == header["column"]:
+                sort_indicator = " ▲" if self.sort_ascending else " ▼"
+                
+            header_label = ttk.Label(
+                header_frame, 
+                text=f"{header['name']}{sort_indicator}",
+                font=("Arial", 10, "bold"),
+                width=header.get('width', 10),
+                cursor="hand2"  # Todas as colunas agora são clicáveis
+            )
+            header_label.pack(side=tk.LEFT)
+            
+            # Vincular evento de clique para ordenação
+            header_label.bind("<Button-1>", lambda e, col=header["column"]: self.sort_table_by_column(col))
+            
+            # Adicionar tooltips explicativos
+            tooltip_text = f"Clique para ordenar por {header['name']}"
+            if header["name"] == "D %":
+                tooltip_text = "Variação percentual no último dia útil (clique para ordenar)"
+            elif header["name"] == "M %":
+                tooltip_text = "Variação percentual no último mês (clique para ordenar)"
+            elif header["name"] == "T %":
+                tooltip_text = "Variação percentual nos últimos 3 meses (clique para ordenar)"
+            elif header["name"] == "A %":
+                tooltip_text = "Variação percentual nos últimos 12 meses (clique para ordenar)"
+            elif header["name"] == "YTD %":
+                tooltip_text = "Variação percentual desde o início do ano (clique para ordenar)"
+            elif "Rentabilidade" in header["name"]:
+                tooltip_text = f"Visualização gráfica da rentabilidade {selected_period.lower()} (clique para ordenar)"
+                
+            self.add_tooltip(header_label, tooltip_text)
 
     def add_tooltip(self, widget, text):
         """Adiciona tooltip a um widget"""
@@ -1320,3 +924,217 @@ class BrazilStocksDashboard:
         if hasattr(self, 'popup') and self.popup:
             self.popup.destroy()
             self.popup = None
+
+    def sort_table_by_column(self, column):
+        """Ordena a tabela por uma coluna específica, alternando entre ascendente e descendente"""
+        # Verificar se estamos ordenando pela mesma coluna
+        if hasattr(self, 'sort_column') and self.sort_column == column:
+            # Inverter a direção de ordenação
+            self.sort_ascending = not self.sort_ascending
+        else:
+            # Nova coluna, definir como ordenação padrão
+            self.sort_column = column
+            self.sort_ascending = True
+        
+        print(f"Ordenando por {column}, {'ascendente' if self.sort_ascending else 'descendente'}")
+        
+        # Aplicar a ordenação e atualizar a tabela
+        self.update_table_with_sorted_data()
+
+    def update_table_with_sorted_data(self):
+        """Atualiza a tabela com dados ordenados pela coluna selecionada"""
+        # Limpar widgets existentes exceto cabeçalhos
+        for widget in self.scrollable_frame.winfo_children():
+            if hasattr(widget, 'grid_info') and widget.grid_info():
+                if int(widget.grid_info().get('row', 0)) > 0:  # Preservar cabeçalhos
+                    widget.destroy()
+        
+        # Obter dados filtrados atuais
+        if hasattr(self, 'sector_var') and self.sector_var.get() != 'Todos':
+            filtered_data = self.filter_by_specific_sector(self.sector_var.get())
+        else:
+            filtered_data = self.performance_data.copy()
+        
+        # Verificar se temos dados
+        if filtered_data.empty:
+            ttk.Label(
+                self.scrollable_frame, 
+                text="Nenhum dado disponível para exibição",
+                font=("Arial", 12)
+            ).grid(row=1, column=0, columnspan=13, padx=10, pady=30)
+            return
+        
+        # Ordenar dados com base na coluna e direção selecionadas
+        if self.sort_column in filtered_data.columns:
+            sorted_data = filtered_data.sort_values(
+                by=self.sort_column, 
+                ascending=self.sort_ascending,
+                na_position='last'  # Colocar valores NaN no final
+            )
+        else:
+            # Se a coluna não existir, usar 'code' como fallback
+            sorted_data = filtered_data.sort_values(by='code')
+            print(f"Aviso: Coluna '{self.sort_column}' não encontrada, ordenando por código")
+        
+        # Mostrar mensagem de resultados
+        selected_sector = self.sector_var.get() if hasattr(self, 'sector_var') else "Todos"
+        
+        # Obter nome legível para a coluna de ordenação
+        column_names = {
+            "code": "Ação", 
+            "current_price": "Preço", 
+            "daily_return": "Rentabilidade diária",
+            "monthly_return": "Rentabilidade mensal", 
+            "quarterly_return": "Rentabilidade trimestral",
+            "yearly_return": "Rentabilidade anual", 
+            "ytd_return": "Rentabilidade YTD"
+        }
+        
+        column_display = column_names.get(self.sort_column, self.sort_column)
+        
+        result_text = f"Mostrando {len(sorted_data)} ações"
+        if selected_sector != "Todos":
+            result_text += f" do setor '{selected_sector}'"
+        
+        result_text += f" - Ordenado por {column_display} {'(crescente) ↑' if self.sort_ascending else '(decrescente) ↓'}"
+        
+        ttk.Label(
+            self.scrollable_frame, 
+            text=result_text, 
+            font=("Arial", 9, "italic")
+        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        
+        # Preencher tabela com dados ordenados
+        self._populate_table_batch(sorted_data, 1, 100, offset=1)
+        
+        # Atualizar os cabeçalhos para mostrar qual coluna está ordenada
+        self._setup_table_headers()
+        
+        # Atualizar cabeçalho da coluna de barras para mostrar o período atual
+        self.update_bar_column_header()
+    
+    def update_bar_column_header(self):
+        """Atualiza o cabeçalho da coluna de barras para mostrar o período atual"""
+        if not hasattr(self, 'scrollable_frame'):
+            return
+            
+        # Obter o widget do cabeçalho da coluna de barras (última coluna)
+        header_widgets = self.scrollable_frame.grid_slaves(row=0, column=13)
+        if not header_widgets:
+            return
+            
+        # Procurar pelo label dentro do frame do cabeçalho
+        header_frame = header_widgets[0]
+        for widget in header_frame.winfo_children():
+            if isinstance(widget, ttk.Label):
+                # Obter o período atual selecionado
+                period = self.visual_period_var.get() if hasattr(self, 'visual_period_var') else "Mensal"
+                widget.config(text=f"Rentabilidade {period}")
+                
+                # Atualizar tooltip
+                self.add_tooltip(widget, f"Visualização gráfica da rentabilidade {period.lower()}")
+                break
+
+    def create_performance_bar(self, parent, value, max_value=30, row=0, column=0):
+        """Cria uma barra horizontal para visualizar a rentabilidade"""
+        frame = ttk.Frame(parent)
+        frame.grid(row=row, column=column, padx=5, pady=2, sticky="w")
+        
+        # Definir tamanho da barra
+        bar_width = 200  # largura total disponível
+        
+        # Garantir que o valor está dentro dos limites
+        if pd.isna(value):
+            value = 0
+        
+        # Limitar valor para visualização
+        capped_value = max(min(value, max_value), -max_value)
+        
+        # Calcular tamanho da barra proporcional ao valor
+        bar_size = int(abs(capped_value) / max_value * (bar_width/2))
+        
+        # Criar canvas para desenhar a barra
+        canvas = tk.Canvas(frame, width=bar_width, height=15, bd=0, highlightthickness=0)
+        canvas.pack(side=tk.LEFT)
+        
+        # Desenhar fundo claro para melhor visibilidade
+        bg_color = "#f0f0ff" if (hasattr(self, 'sort_column') and 
+                               self.sort_column == self.selected_metric) else "#f8f8f8"
+        canvas.create_rectangle(0, 0, bar_width, 15, fill=bg_color, outline="")
+        
+        # Linha central (zero)
+        canvas.create_line(bar_width/2, 0, bar_width/2, 15, fill="gray")
+        
+        # Desenhar a barra
+        if value > 0:
+            # Barra positiva (à direita)
+            canvas.create_rectangle(
+                bar_width/2, 3, 
+                bar_width/2 + bar_size, 12, 
+                fill="#4CAF50", outline="")  # Verde mais suave
+        elif value < 0:
+            # Barra negativa (à esquerda)
+            canvas.create_rectangle(
+                bar_width/2 - bar_size, 3, 
+                bar_width/2, 12, 
+                fill="#F44336", outline="")  # Vermelho mais suave
+        
+        # Adicionar valor como texto
+        text_x = bar_width/2 + 5 if value >= 0 else bar_width/2 - 5
+        value_text = f"{value:.1f}%" if not pd.isna(value) else "N/A"
+        value_color = "#006400" if value > 0 else "#8B0000" if value < 0 else "black"
+        
+        # Adicionar o texto diretamente no canvas
+        canvas.create_text(
+            text_x, 7.5, 
+            text=value_text,
+            fill=value_color,
+            font=("Arial", 8, "bold"),
+            anchor="w" if value >= 0 else "e"
+        )
+        
+        # Adicionar tooltip com valor exato
+        if not pd.isna(value):
+            period = self.visual_period_var.get() if hasattr(self, 'visual_period_var') else "Mensal"
+            self.add_tooltip(canvas, f"Rentabilidade {period.lower()}: {value:.2f}%")
+        
+        return frame
+
+    def _on_period_selected(self, event=None):
+        """Atualiza a visualização quando o período é alterado - versão completamente corrigida"""
+        # Obter diretamente do combobox para garantir valor atualizado
+        selected_period = self.period_combobox.get()
+        
+        # Imprimir informações de diagnóstico
+        print(f"Período selecionado no combobox: '{selected_period}'")
+        print(f"Valor atual da variável visual_period_var: '{self.visual_period_var.get()}'")
+        
+        # Obter coluna correspondente
+        new_metric = self.period_column_map.get(selected_period, 'monthly_return')
+        old_metric = self.selected_metric if hasattr(self, 'selected_metric') else 'monthly_return'
+        
+        print(f"Comparando métricas - antiga: '{old_metric}', nova: '{new_metric}'")
+        
+        # Forçar atualização da variável StringVar
+        self.visual_period_var.set(selected_period)
+        
+        # Atualizar a métrica selecionada independentemente de parecer igual
+        self.selected_metric = new_metric
+        print(f"Atualizando métrica para: '{new_metric}'")
+        
+        # Verificar ordenação
+        if hasattr(self, 'sort_column') and self.sort_column in self.period_column_map.values():
+            print(f"Atualizando coluna de ordenação de '{self.sort_column}' para '{new_metric}'")
+            self.sort_column = new_metric
+        
+        # Desativar eventos temporariamente para evitar loops
+        self.period_combobox.unbind("<<ComboboxSelected>>")
+        
+        # Atualizar a interface
+        try:
+            self._setup_table_headers()  # Atualizar cabeçalhos
+            self.update_bar_column_header()  # Atualizar título da coluna de barras
+            self.update_table_with_sorted_data()  # Atualizar tabela
+        finally:
+            # Restaurar binding após um pequeno delay
+            self.master.after(200, lambda: self.period_combobox.bind("<<ComboboxSelected>>", self._on_period_selected))
