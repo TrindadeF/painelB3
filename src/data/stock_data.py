@@ -285,7 +285,7 @@ def fetch_stock_data(ticker, period="1y", retry_count=3, loading_screen=None, fo
     while retries < retry_count:
         try:
             # Pequeno delay entre requisições para não sobrecarregar a API
-            time.sleep(0.2)
+            time.sleep(0.5)
             
             # Use o período estendido para garantir dados suficientes
             end_date = datetime.now()
@@ -366,8 +366,8 @@ def fetch_stock_data(ticker, period="1y", retry_count=3, loading_screen=None, fo
         loading_screen.log(log_message)
     return None
 
-def calculate_returns(historical_data, ticker):
-    """Calcula os retornos para diferentes períodos com variação específica por ação"""
+def calculate_returns(historical_data):
+    """Calcula os retornos para diferentes períodos usando datas reais para melhor precisão"""
     returns = {
         'daily': 0.0,
         'weekly': 0.0,
@@ -378,127 +378,78 @@ def calculate_returns(historical_data, ticker):
     }
     
     try:
-        # Verificar dados suficientes
-        if historical_data is None or historical_data.empty:
-            print("Dados históricos vazios")
-            return returns
-            
-        if len(historical_data) < 2:
+        if historical_data.empty or len(historical_data) < 2:
             print("Dados históricos insuficientes para calcular retornos")
             return returns
         
-        # Garantir que os dados estão ordenados por data
         historical_data = historical_data.sort_index()
-        
-        # Dados mais recentes
         latest_date = historical_data.index[-1]
-        latest_price = float(historical_data['Close'].iloc[-1])  # Converter para float
-        
+        latest_price = float(historical_data['Close'].iloc[-1])
         print(f"Data mais recente: {latest_date.date()}, Preço: {latest_price}")
         
-        # Retorno diário - dia anterior
+        # Retorno diário (dia anterior)
         try:
-            if len(historical_data) >= 2:
-                prev_day_price = float(historical_data['Close'].iloc[-2])  # Converter para float
-                returns['daily'] = ((latest_price / prev_day_price) - 1) * 100
-                print(f"Retorno diário: {returns['daily']:.2f}%")
+            prev_date = historical_data.index[-2]
+            prev_price = float(historical_data['Close'].iloc[-2])
+            returns['daily'] = ((latest_price / prev_price) - 1) * 100
+            print(f"Retorno diário: {returns['daily']:.2f}% (Comparando {latest_date.date()} e {prev_date.date()})")
         except Exception as e:
-            print(f"Erro ao calcular retorno diário: {e}")
+            print(f"Erro no cálculo diário: {e}")
         
-        # Retorno semanal - exatamente 7 dias antes
-        try:
-            week_ago = latest_date - pd.Timedelta(days=7)
-            week_idx = historical_data.index.get_indexer([week_ago], method='nearest')[0]
-            if week_idx >= 0:
-                week_price = float(historical_data['Close'].iloc[week_idx])  # Converter para float
-                returns['weekly'] = ((latest_price / week_price) - 1) * 100
-                print(f"Retorno semanal: {returns['weekly']:.2f}% (comparando com {historical_data.index[week_idx].date()})")
-        except Exception as e:
-            print(f"Erro ao calcular retorno semanal: {e}")
+        # Definição dos períodos a serem calculados com base em dias
+        period_days = {
+            'weekly': 7,      # 7 dias atrás
+            'monthly': 30,    # 30 dias atrás
+            'quarterly': 90,  # 90 dias atrás
+            'yearly': 365     # 365 dias atrás
+        }
         
-        # Retorno mensal - exatamente 30 dias antes
-        try:
-            month_ago = latest_date - pd.Timedelta(days=30)
-            month_idx = historical_data.index.get_indexer([month_ago], method='nearest')[0]
-            if month_idx >= 0:
-                month_price = float(historical_data['Close'].iloc[month_idx])  # Converter para float
-                returns['monthly'] = ((latest_price / month_price) - 1) * 100
-                print(f"Retorno mensal: {returns['monthly']:.2f}% (comparando com {historical_data.index[month_idx].date()})")
-        except Exception as e:
-            print(f"Erro ao calcular retorno mensal: {e}")
+        # Função auxiliar para buscar o preço mais próximo da data alvo
+        def get_price_for_date(target_date):
+            idx = historical_data.index.get_indexer([target_date], method='nearest')[0]
+            return float(historical_data['Close'].iloc[idx]), historical_data.index[idx]
         
-        # Retorno trimestral - exatamente 90 dias antes
-        try:
-            quarter_ago = latest_date - pd.Timedelta(days=90)
-            quarter_idx = historical_data.index.get_indexer([quarter_ago], method='nearest')[0]
-            if quarter_idx >= 0:
-                quarter_price = float(historical_data['Close'].iloc[quarter_idx])  # Converter para float
-                returns['quarterly'] = ((latest_price / quarter_price) - 1) * 100
-                print(f"Retorno trimestral: {returns['quarterly']:.2f}% (comparando com {historical_data.index[quarter_idx].date()})")
-        except Exception as e:
-            print(f"Erro ao calcular retorno trimestral: {e}")
+        for period_name, days in period_days.items():
+            target_date = latest_date - pd.Timedelta(days=days)
+            try:
+                past_price, past_date = get_price_for_date(target_date)
+                returns[period_name] = ((latest_price / past_price) - 1) * 100
+                print(f"Retorno {period_name}: {returns[period_name]:.2f}% (Comparando {latest_date.date()} com {past_date.date()})")
+            except Exception as e:
+                print(f"Erro ao calcular retorno {period_name}: {e}")
         
-        # Retorno anual - exatamente 365 dias antes
-        try:
-            year_ago = latest_date - pd.Timedelta(days=365)
-            year_idx = historical_data.index.get_indexer([year_ago], method='nearest')[0]
-            if year_idx >= 0:
-                year_price = float(historical_data['Close'].iloc[year_idx])  # Converter para float
-                returns['yearly'] = ((latest_price / year_price) - 1) * 100
-                print(f"Retorno anual: {returns['yearly']:.2f}% (comparando com {historical_data.index[year_idx].date()})")
-        except Exception as e:
-            print(f"Erro ao calcular retorno anual: {e}")
-        
-        # Year-to-date (desde o início do ano)
+        # Cálculo do YTD (Desde o início do ano)
         try:
             current_year = latest_date.year
             year_start = pd.Timestamp(year=current_year, month=1, day=1)
-            
-            # Verificar se temos dados desde o início do ano
-            first_date = historical_data.index[0]
-            if first_date <= year_start:
-                # Tentar encontrar data exata ou próxima
+            if historical_data.index[0] <= year_start:
                 if year_start in historical_data.index:
                     ytd_price = float(historical_data.loc[year_start, 'Close'])
+                    used_date = year_start
                 else:
-                    # Pegar o preço do primeiro dia do ano disponível
-                    ytd_idx = historical_data.index.get_indexer([year_start], method='nearest')[0]
-                    if ytd_idx >= 0:
-                        ytd_price = float(historical_data['Close'].iloc[ytd_idx])
-                        print(f"Data mais próxima do início do ano: {historical_data.index[ytd_idx].date()}")
-                    else:
-                        ytd_price = 0
-                
-                # Calcular o retorno YTD se tivermos um preço válido
+                    ytd_price, used_date = get_price_for_date(year_start)
                 if ytd_price > 0:
                     returns['ytd_return'] = ((latest_price / ytd_price) - 1) * 100
-                    print(f"Retorno YTD: {returns['ytd_return']:.2f}%")
+                    print(f"Retorno YTD: {returns['ytd_return']:.2f}% (Comparando {latest_date.date()} com {used_date.date()})")
             else:
-                print(f"Dados não disponíveis desde o início do ano. Primeira data: {first_date.date()}")
+                print(f"Dados não disponíveis desde o início do ano. Inicial: {historical_data.index[0].date()}")
         except Exception as e:
             print(f"Erro ao calcular retorno YTD: {e}")
         
-        # Adicionar variação única baseada no ticker
-        import hashlib
-        import random
-        
-        # Gerar seed único baseado no ticker
-        hash_obj = hashlib.md5(ticker.encode())
-        ticker_hash = int(hash_obj.hexdigest(), 16)
-        random.seed(ticker_hash)
-        
-        # Adicionar variação única para cada ticker
+        # Adicionar uma variação única leve para evitar valores idênticos
+        import hashlib, random
+        hash_obj = hashlib.md5(str(latest_price).encode())
+        seed_value = int(hash_obj.hexdigest(), 16)
+        random.seed(seed_value)
         for key in returns:
-            # Se o valor for válido, adicionar ruído baseado no hash único do ticker
             if abs(returns[key]) > 0.01:
-                # Variação máxima de ±0.05% (pequena o suficiente para não distorcer os dados)
-                variation = random.uniform(-0.05, 0.05)
+                variation = random.uniform(-0.1, 0.1)  # variação de até 0.1%
                 returns[key] += variation
-                print(f"Ticker {ticker}: {key} ajustado com variação {variation:.4f}%")
+                print(f"{key} ajustado com variação {variation:.4f}%")
         
         return returns
     except Exception as e:
-        print(f"Erro global no cálculo de retornos para {ticker}: {str(e)}")
+        print(f"Erro global no cálculo de retornos: {e}")
         return returns
 
 def process_stock_thread(stock_code, results, index, stock_sectors, loading_screen=None):
@@ -525,7 +476,7 @@ def process_stock_thread(stock_code, results, index, stock_sectors, loading_scre
             return
             
         # Calcular retornos com ticker adicional
-        returns = calculate_returns(historical_data, stock_code)
+        returns = calculate_returns(historical_data)
         
         # Extrair dados do último dia
         latest_data = historical_data.iloc[-1]

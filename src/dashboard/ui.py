@@ -895,25 +895,25 @@ class BrazilStocksDashboard:
         
         headers = [
             {"name": "Ação", "column": "code", "width": 10},
-            {"name": "Preço", "column": "current_price", "width": 8},
-            {"name": "Abertura", "column": "open_price", "width": 8},
-            {"name": "Mínima", "column": "low_price", "width": 8},
-            {"name": "Máxima", "column": "high_price", "width": 8},
-            {"name": "Fechamento", "column": "close_price", "width": 8},
+            {"name": "Preço", "column": "current_price", "width": 10},
+            {"name": "Abertura", "column": "open_price", "width": 10},
+            {"name": "Mínima", "column": "low_price", "width": 10},
+            {"name": "Máxima", "column": "high_price", "width": 10},
+            {"name": "Fechamento", "column": "close_price", "width": 13},
             {"name": "Volume R$", "column": "volume", "width": 10},       # Clarificado o nome
-            {"name": "Qtd Negócios", "column": "trades", "width": 8},     # Clarificado o nome
-            {"name": "Diario %", "column": "daily_return", "width": 6},
-            {"name": "Mensal %", "column": "monthly_return", "width": 6},
-            {"name": "Trimestral %", "column": "quarterly_return", "width": 6},
-            {"name": "Anual %", "column": "yearly_return", "width": 6},
-            {"name": "YTD %", "column": "ytd_return", "width": 6},
+            {"name": "Qtd Negócios", "column": "trades", "width": 13},     # Clarificado o nome
+            {"name": "Diario %", "column": "daily_return", "width": 10},
+            {"name": "Mensal %", "column": "monthly_return", "width": 10},
+            {"name": "Trimestral %", "column": "quarterly_return", "width": 13},
+            {"name": "Anual %", "column": "yearly_return", "width": 10},
+            {"name": "YTD %", "column": "ytd_return", "width": 10},
             {"name": f"Rentabilidade {selected_period}", "column": selected_metric, "width": 20},  
         ]
         
         for col, header in enumerate(headers):
             # Criar um frame para o cabeçalho para poder adicionar indicador de ordenação
             header_frame = ttk.Frame(self.scrollable_frame)
-            header_frame.grid(row=0, column=col, padx=5, pady=5, sticky="w")
+            header_frame.grid(row=0, column=col, padx=9, pady=9, sticky="w")
             
             # Verificar se esta coluna é a de ordenação atual
             sort_indicator = ""
@@ -1207,7 +1207,11 @@ class BrazilStocksDashboard:
             self.update_table_with_sorted_data()  # Atualizar tabela
         finally:
             # Restaurar binding após um pequeno delay
-            self.master.after(200, lambda: self.period_combobox.bind("<<ComboboxSelected>>", self._on_period_selected))
+            try:
+                if self.master.winfo_exists():
+                    self.master.after(200, lambda: self.period_combobox.bind("<<ComboboxSelected>>", self._on_period_selected))
+            except Exception as e:
+                print(f"Erro ao re-associar binding: {e}")
 
     def verify_duplicate_data(self):
         """Verifica e lista ações que possuem valores idênticos suspeitos"""
