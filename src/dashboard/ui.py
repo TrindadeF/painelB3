@@ -25,6 +25,9 @@ class BrazilStocksDashboard:
         
         self.create_widgets()
         
+        # Diagnóstico de dados
+        self.verify_duplicate_data()
+        
     def create_widgets(self):
         """Cria todos os widgets do dashboard - versão simplificada sem painel de gráficos"""
         # Frame principal 
@@ -49,22 +52,12 @@ class BrazilStocksDashboard:
         ttk.Button(cache_frame, text="Forçar Atualização de Dados", 
                   command=self.clear_data_cache).pack(side=tk.LEFT, padx=5)
         
-        # Adicionar opção para limitar número de ações
-        limit_frame = ttk.Frame(controls_frame)
-        limit_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        self.limit_var = tk.BooleanVar(value=True)
-        limit_check = ttk.Checkbutton(limit_frame, text="Mostrar apenas ações principais (melhor performance)", 
-                                     variable=self.limit_var, command=self.toggle_stock_limit)
-        limit_check.pack(side=tk.LEFT, padx=5)
-        
         # Frame para tabela de ações
         self.stocks_frame = ttk.LabelFrame(main_frame, text="Ações")
         self.stocks_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Setup da tabela de ações com rolagem
         self.setup_scrollable_stock_table()
-
 
         
     def get_filtered_data(self):
@@ -136,7 +129,7 @@ class BrazilStocksDashboard:
             text="Aplicando filtros...", 
             font=("Arial", 10, "italic")
         )
-        status_label.grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        status_label.grid(row=1, column=0, columnspan=14, padx=10, pady=5)
         self.scrollable_frame.update_idletasks()
         
         # Obter texto do filtro
@@ -174,7 +167,7 @@ class BrazilStocksDashboard:
             self.scrollable_frame, 
             text=result_text, 
             font=("Arial", 9, "italic")
-        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        ).grid(row=1, column=0, columnspan=14, padx=10, pady=5)
         
         # Ordenar e mostrar dados filtrados
         sorted_data = filtered_data.sort_values(by='code')
@@ -193,7 +186,7 @@ class BrazilStocksDashboard:
             text="Limpando filtros...", 
             font=("Arial", 10, "italic")
         )
-        status_label.grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        status_label.grid(row=1, column=0, columnspan=14, padx=10, pady=5)
         self.scrollable_frame.update_idletasks()
         
         # Limpar completamente a tabela (exceto cabeçalhos)
@@ -211,7 +204,7 @@ class BrazilStocksDashboard:
                 self.scrollable_frame, 
                 text="Nenhum dado disponível", 
                 font=("Arial", 12)
-            ).grid(row=1, column=0, columnspan=13, padx=10, pady=10)
+            ).grid(row=1, column=0, columnspan=14, padx=10, pady=10)
             return
         
         # Exibir status de recarregamento
@@ -219,7 +212,7 @@ class BrazilStocksDashboard:
             self.scrollable_frame, 
             text=f"Mostrando todas as {len(all_data)} ações", 
             font=("Arial", 9, "italic")
-        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        ).grid(row=1, column=0, columnspan=14, padx=10, pady=5)
         
         # Ordenar e mostrar todos os dados
         sorted_data = all_data.sort_values(by='code')
@@ -319,7 +312,7 @@ class BrazilStocksDashboard:
             text=f"Filtrando ações do setor: {selected_sector}...", 
             font=("Arial", 10, "italic")
         )
-        loading_label.grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        loading_label.grid(row=1, column=0, columnspan=14, padx=10, pady=5)
         self.scrollable_frame.update()
         
         # Forçar a filtragem específica do setor selecionado
@@ -337,7 +330,7 @@ class BrazilStocksDashboard:
                 self.scrollable_frame, 
                 text=f"Nenhuma ação encontrada no setor '{selected_sector}'", 
                 font=("Arial", 12)
-            ).grid(row=1, column=0, columnspan=13, padx=10, pady=30)
+            ).grid(row=1, column=0, columnspan=14, padx=10, pady=30)
             return
         
         # Mensagem de resultado
@@ -349,7 +342,7 @@ class BrazilStocksDashboard:
             self.scrollable_frame, 
             text=result_text, 
             font=("Arial", 9, "italic")
-        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        ).grid(row=1, column=0, columnspan=14, padx=10, pady=5)
         
         # Preencher tabela com dados filtrados
         if hasattr(self, 'sort_column') and self.sort_column in filtered_data.columns:
@@ -436,7 +429,7 @@ class BrazilStocksDashboard:
             self.scrollable_frame, 
             text="Carregando todas as ações...", 
             font=("Arial", 10, "italic")
-        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        ).grid(row=1, column=0, columnspan=14, padx=10, pady=5)
         self.scrollable_frame.update()
         
         # Obter todos os dados
@@ -453,7 +446,7 @@ class BrazilStocksDashboard:
             self.scrollable_frame, 
             text=f"Mostrando todas as {len(all_data)} ações", 
             font=("Arial", 9, "italic")
-        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        ).grid(row=1, column=0, columnspan=14, padx=10, pady=5)
         
         # Preencher tabela
         sorted_data = all_data.sort_values(by='code')
@@ -591,6 +584,19 @@ class BrazilStocksDashboard:
                 # Obter dados básicos
                 ticker = str(row['code']) if 'code' in row else "N/A"
                 
+                # Executar diagnóstico para ações problemáticas conhecidas
+                problematic_tickers = ["ELET6", "ENEV3", "ENGI11", "CMIG4", "CPFE3"]
+                if ticker in problematic_tickers:
+                    self.debug_value_issues(ticker, row, ["daily_return", "monthly_return", 
+                                                        "quarterly_return", "yearly_return"])
+                
+                # Verificar se os dados estão em branco ou zerados
+                visual_value = self.safe_get_value(row, selected_return_col)
+                
+                # Debug para valores problemáticos
+                if pd.isna(visual_value) or visual_value == 0.0:
+                    print(f"Atenção: {ticker} tem valor {selected_return_col}={visual_value}")
+                
                 # Obter valores com segurança
                 price = self.safe_get_value(row, 'current_price')
                 open_price = self.safe_get_value(row, 'open_price')
@@ -639,8 +645,26 @@ class BrazilStocksDashboard:
                 
                 ttk.Label(self.scrollable_frame, text=vol_text).grid(
                     row=grid_row, column=6, padx=5, pady=2, sticky="e")
-                ttk.Label(self.scrollable_frame, text=f"{trades_volume:,.0f}").grid(
-                    row=grid_row, column=7, padx=5, pady=2, sticky="e")
+                
+                # Formatação melhorada para quantidade de negócios
+                trades_volume = self.safe_get_value(row, 'trades') if 'trades' in row else 0.0
+
+                # Formatação melhorada para quantidade de negócios (mais legível)
+                if trades_volume > 1_000_000:
+                    trades_text = f"{trades_volume/1_000_000:.2f}M"
+                elif trades_volume > 1_000:
+                    trades_text = f"{trades_volume/1_000:.1f}K"
+                elif trades_volume > 0:
+                    trades_text = f"{trades_volume:.0f}"
+                else:
+                    trades_text = "N/A"
+
+                trades_label = ttk.Label(self.scrollable_frame, text=trades_text)
+                trades_label.grid(row=grid_row, column=7, padx=5, pady=2, sticky="e")
+
+                # Adicionar tooltip com informação adicional
+                if trades_volume > 0:
+                    self.add_tooltip(trades_label, f"Total de {trades_volume:,.0f} negociações")
                 
                 # Formatar as variações com cores
                 self.create_change_label(self.scrollable_frame, daily_change, row=grid_row, column=8)
@@ -674,12 +698,40 @@ class BrazilStocksDashboard:
         try:
             if column_name in row:
                 value = row[column_name]
+                
+                # Caso 1: Valor é uma Series
                 if isinstance(value, pd.Series):
-                    return float(value.iloc(0))
+                    if len(value) > 0:
+                        try:
+                            # Acessar explicitamente o primeiro valor com iloc[0]
+                            return float(value.iloc[0])
+                        except Exception as e:
+                            print(f"Erro ao converter Series para {row.get('code','')}.{column_name}: {str(e)}")
+                            # Se o primeiro valor for string, tente converter com tratamento adicional
+                            try:
+                                first_val = value.iloc[0]
+                                if isinstance(first_val, str):
+                                    return float(first_val.replace(',', '.'))
+                                return 0.0
+                            except:
+                                return 0.0
+                    return 0.0
+                
+                # Caso 2: Valor é None ou NaN
+                elif pd.isna(value):
+                    return 0.0
+                
+                # Caso 3: Valor é um tipo básico (int, float, etc)
                 else:
-                    return float(value)
+                    try:
+                        return float(value)
+                    except (ValueError, TypeError):
+                        print(f"Erro ao converter {row.get('code','')}.{column_name}={value} ({type(value)})")
+                        return 0.0
+                        
             return 0.0
-        except Exception:
+        except Exception as e:
+            print(f"Erro ao processar {row.get('code','desconhecido')}.{column_name}: {str(e)}")
             return 0.0
 
     def add_selection_bindings(self):
@@ -808,6 +860,11 @@ class BrazilStocksDashboard:
             try:
                 cache = StockDataCache()
                 cache.clear_cache()
+                
+                # Definir variável de ambiente para forçar período maior
+                import os
+                os.environ['FORCE_EXTENDED_DATA'] = 'True'
+                
                 messagebox.showinfo("Cache limpo", "Cache removido. O programa será reiniciado para carregar dados atualizados.")
                 
                 # Reiniciar o programa
@@ -833,7 +890,6 @@ class BrazilStocksDashboard:
 
     def _setup_table_headers(self):
         """Configura os cabeçalhos da tabela de ações com ordenação interativa"""
-        # Get the currently selected metric for rentability column
         selected_metric = self.selected_metric if hasattr(self, 'selected_metric') else 'monthly_return'
         selected_period = self.visual_period_var.get() if hasattr(self, 'visual_period_var') else "Mensal"
         
@@ -844,14 +900,14 @@ class BrazilStocksDashboard:
             {"name": "Mínima", "column": "low_price", "width": 8},
             {"name": "Máxima", "column": "high_price", "width": 8},
             {"name": "Fechamento", "column": "close_price", "width": 8},
-            {"name": "Volume", "column": "volume", "width": 10},
-            {"name": "Negócios", "column": "trades", "width": 8},
+            {"name": "Volume R$", "column": "volume", "width": 10},       # Clarificado o nome
+            {"name": "Qtd Negócios", "column": "trades", "width": 8},     # Clarificado o nome
             {"name": "Diario %", "column": "daily_return", "width": 6},
             {"name": "Mensal %", "column": "monthly_return", "width": 6},
             {"name": "Trimestral %", "column": "quarterly_return", "width": 6},
             {"name": "Anual %", "column": "yearly_return", "width": 6},
             {"name": "YTD %", "column": "ytd_return", "width": 6},
-            {"name": f"Rentabilidade {selected_period}", "column": selected_metric, "width": 20},  # Usando o campo real de dados
+            {"name": f"Rentabilidade {selected_period}", "column": selected_metric, "width": 20},  
         ]
         
         for col, header in enumerate(headers):
@@ -894,24 +950,36 @@ class BrazilStocksDashboard:
             self.add_tooltip(header_label, tooltip_text)
 
     def add_tooltip(self, widget, text):
-        """Adiciona tooltip a um widget"""
+        """Adiciona tooltip a um widget com tratamento de erros"""
         def enter(event):
-            # Criar janela popup
-            x, y, _, _ = widget.bbox("insert")
-            x += widget.winfo_rootx() + 25
-            y += widget.winfo_rooty() + 20
-            
-            # Remover popup existente
-            self.hide_tooltip()
-            
-            # Criar novo popup
-            self.popup = tk.Toplevel(widget)
-            self.popup.wm_overrideredirect(True)
-            self.popup.wm_geometry(f"+{x}+{y}")
-            
-            label = ttk.Label(self.popup, text=text, background="#ffffe0", 
-                             relief="solid", borderwidth=1, font=("Arial", 9))
-            label.pack(ipadx=5, ipady=2)
+            # Criar janela popup com verificação de erros
+            try:
+                # Verificar se o widget ainda existe e tem bbox
+                if not widget.winfo_exists():
+                    return
+                    
+                bbox = widget.bbox("insert")
+                if not bbox:  # Se bbox for None, usar coordenadas alternativas
+                    x = widget.winfo_rootx() + 20
+                    y = widget.winfo_rooty() + 20
+                else:
+                    x, y, _, _ = bbox
+                    x += widget.winfo_rootx() + 25
+                    y += widget.winfo_rooty() + 20
+                
+                # Remover popup existente
+                self.hide_tooltip()
+                
+                # Criar novo popup
+                self.popup = tk.Toplevel(widget)
+                self.popup.wm_overrideredirect(True)
+                self.popup.wm_geometry(f"+{x}+{y}")
+                
+                label = ttk.Label(self.popup, text=text, background="#ffffe0", 
+                                relief="solid", borderwidth=1, font=("Arial", 9))
+                label.pack(ipadx=5, ipady=2)
+            except Exception as e:
+                print(f"Erro ao mostrar tooltip: {e}")
         
         def leave(event):
             self.hide_tooltip()
@@ -987,7 +1055,9 @@ class BrazilStocksDashboard:
             "monthly_return": "Rentabilidade mensal", 
             "quarterly_return": "Rentabilidade trimestral",
             "yearly_return": "Rentabilidade anual", 
-            "ytd_return": "Rentabilidade YTD"
+            "ytd_return": "Rentabilidade YTD",
+            "trades": "Quantidade de Negócios",  # Adicionado
+            "volume": "Volume Financeiro"  # Adicionado
         }
         
         column_display = column_names.get(self.sort_column, self.sort_column)
@@ -1002,7 +1072,7 @@ class BrazilStocksDashboard:
             self.scrollable_frame, 
             text=result_text, 
             font=("Arial", 9, "italic")
-        ).grid(row=1, column=0, columnspan=13, padx=10, pady=5)
+        ).grid(row=1, column=0, columnspan=14, padx=10, pady=5)
         
         # Preencher tabela com dados ordenados
         self._populate_table_batch(sorted_data, 1, 100, offset=1)
@@ -1138,3 +1208,129 @@ class BrazilStocksDashboard:
         finally:
             # Restaurar binding após um pequeno delay
             self.master.after(200, lambda: self.period_combobox.bind("<<ComboboxSelected>>", self._on_period_selected))
+
+    def verify_duplicate_data(self):
+        """Verifica e lista ações que possuem valores idênticos suspeitos"""
+        print("\n===== DIAGNÓSTICO DE DADOS =====")
+        
+        # Dicionário para armazenar valores de retorno por porcentagem
+        return_dict = {}
+        suspicious_pairs = []
+        
+        # Colunas a verificar
+        check_columns = ['daily_return', 'monthly_return', 'quarterly_return', 'yearly_return', 'ytd_return']
+        
+        # Para cada linha nos dados
+        for _, row in self.performance_data.iterrows():
+            ticker = row.get('code', 'UNKNOWN')
+            
+            # Criar uma tupla com valores arredondados para 1 casa decimal 
+            # (para reduzir detecção de falsos duplicados por causa do ruído)
+            returns = tuple(round(self.safe_get_value(row, col), 1) for col in check_columns)
+            
+            # Se encontrar valores idênticos
+            if returns in return_dict:
+                # Esta ação tem valores idênticos a outra já processada
+                matching_ticker = return_dict[returns]
+                suspicious_pairs.append((ticker, matching_ticker, returns))
+            else:
+                # Adiciona esta ação ao dicionário
+                return_dict[returns] = ticker
+        
+        # Exibir resultados
+        if suspicious_pairs:
+            print(f"ATENÇÃO: Encontrados {len(suspicious_pairs)} pares de ações com dados muito similares!")
+            for i, pair in enumerate(suspicious_pairs):
+                ticker1, ticker2, values = pair
+                if i < 10:  # Limitar a exibição para não sobrecarregar o console
+                    print(f"- {ticker1} e {ticker2} têm valores similares: {values}")
+            
+            if len(suspicious_pairs) > 10:
+                print(f"... e mais {len(suspicious_pairs)-10} pares")
+                
+        else:
+            print("Nenhum par de ações com dados exatamente idênticos encontrado.")
+        
+        # Resumo por tipo de dado
+        print("\nResumo da qualidade dos dados:")
+        for col in check_columns:
+            values = [self.safe_get_value(row, col) for _, row in self.performance_data.iterrows()]
+            unique_values = len(set(round(v, 2) for v in values if not pd.isna(v)))
+            zeros = sum(1 for v in values if abs(v) < 0.01)
+            print(f"- {col}: {unique_values} valores únicos, {zeros} zeros ({zeros/len(values)*100:.1f}%)")
+
+    def _check_raw_data(self, ticker):
+        """Verifica dados brutos da fonte para um ticker específico"""
+        try:
+            from data.stock_data import fetch_stock_data
+            print(f"\nVERIFICANDO DADOS BRUTOS para {ticker}:")
+            
+            # Adicionar .SA se não estiver presente
+            full_ticker = f"{ticker}.SA" if not ticker.endswith('.SA') else ticker
+            
+            # Buscar dados diretamente
+            raw_data = fetch_stock_data(full_ticker)
+            
+            # Correção: Pandas DataFrame tem apenas .empty (não tem is_empty)
+            if raw_data is None or raw_data.empty:
+                print(f"Não foi possível obter dados brutos para {ticker}")
+            else:
+                # Mostrar as últimas linhas dos dados
+                print(f"Últimos dados para {ticker}:")
+                print(raw_data.tail(3))
+                
+                # Calcular alguns valores básicos para verificar
+                if len(raw_data) > 1:
+                    last_close = raw_data['Close'].iloc[-1]
+                    prev_close = raw_data['Close'].iloc[-2]
+                    daily_change = ((last_close/prev_close) - 1) * 100
+                    print(f"Variação diária calculada: {daily_change:.2f}%")
+        except Exception as e:
+            print(f"Erro ao verificar dados brutos para {ticker}: {str(e)}")
+
+def calculate_returns(historical_data):
+    """Calcula os retornos para diferentes períodos com verificações adicionais"""
+    returns = {
+        'daily': 0.0,
+        'weekly': 0.0,
+        'monthly': 0.0,
+        'quarterly': 0.0,
+        'yearly': 0.0
+    }
+    
+    try:
+        # Verifica se há dados suficientes
+        if historical_data.empty or len(historical_data) < 2:
+            print("Dados históricos insuficientes para calcular retornos")
+            return returns
+        
+        # Ordena os dados por data para garantir cálculos corretos
+        historical_data = historical_data.sort_index()
+        
+        # Calcula a variação diária (desde o dia anterior)
+        if len(historical_data) >= 2:
+            latest = historical_data['Close'].iloc[-1]
+            previous = historical_data['Close'].iloc[-2]
+            returns['daily'] = ((latest / previous) - 1) * 100
+            
+        # Calcula variações de períodos maiores com verificação de dados suficientes
+        periods = {
+            'weekly': 5,      # ~5 dias úteis
+            'monthly': 21,    # ~21 dias úteis
+            'quarterly': 63,  # ~63 dias úteis
+            'yearly': 252     # ~252 dias úteis
+        }
+        
+        for period_name, days in periods.items():
+            if len(historical_data) > days:
+                latest = historical_data['Close'].iloc[-1]
+                past = historical_data['Close'].iloc[-min(days, len(historical_data)-1)]
+                returns[period_name] = ((latest / past) - 1) * 100
+                print(f"Calculado {period_name} para histórico de {len(historical_data)} dias: {returns[period_name]:.2f}%")
+            else:
+                print(f"Dados insuficientes para {period_name}: {len(historical_data)} < {days}")
+        
+        return returns
+    except Exception as e:
+        print(f"Erro ao calcular retornos: {str(e)}")
+        return returns
